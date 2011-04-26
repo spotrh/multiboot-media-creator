@@ -1,0 +1,30 @@
+            *** Multiboot Media Creator ***
+*** Copyright 2011 Tom Callaway <spot@fedoraproject.org> ***
+
+== What is it? ==
+* It is a tool that generates a Multiboot ISO image from a set of ISO images,
+with pretty menus. 
+* It has support for isolinux (default) and grub. 
+* It is written in Python.
+* It supports multiarch for x86_64/i686. This means that if you pass two ISOs 
+with the same naming model for both x86_64 and i[3456]86, the tool will write
+an entry that uses isolinux's ability to check the system cpu and boot the 
+appropriate item.
+* It supports both Live and Non-Live (Installation ISO) Images.
+* It was generated for Fedora, and has hardcoded filename assumptions. 
+(Non Fedora Non-Live support will need some code changes.)
+
+== How do I use it ? ==
+Here is a sample invocation:
+
+sudo ./multiboot-media-creator.py --isos Fedora-15-Beta-*-Live-*.iso -v \
+--clean --bootdefault Fedora-15-Beta-i686-Live-Desktop.iso \
+--target Fedora-15-Beta-Multi-Boot.iso --targetname Fedora-15-Beta-Multi-Boot
+
+Please note, this is a single line command, I've just split it up to make this 
+README more friendly. If you run multiboot-media-creator.py 
+
+== TODO List ==
+* Disable verification entries (they don't work because you can't verify 
+either live or non-live entries in a multiboot layout).
+* Add better tiered menus for the individual arch entries in a multiarch layout
