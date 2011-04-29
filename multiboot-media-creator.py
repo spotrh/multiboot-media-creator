@@ -110,16 +110,6 @@ def makeisolinuximage(isolist, imagedir, mountdir, timeout, bootdefaultnum, targ
     bvt.write('menu title Boot (Basic Video)\n')
     bvt.write('\n')
 
-    # This file is where we store the Verify Media targets
-    # If all our targets are non-live, we won't have anything here.
-    # Hence, we default to false.
-    verifyentries = False
-    vtfile = os.path.join(imagedir, 'verifytargets.part')
-    vt = open(vtfile, 'w') 
-    vt.write('menu begin\n')
-    vt.write('menu title Verify and Boot...\n')
-    vt.write('\n')
-
     # This file is where we store any multiarch targets
     # If we're not in multiarch mode, or we don't find any multiarch targets,
     # this file will be empty.
@@ -239,26 +229,7 @@ def makeisolinuximage(isolist, imagedir, mountdir, timeout, bootdefaultnum, targ
             bvt.write('  append initrd=/{0}/isolinux/initrd0.img root=live:CDLABEL={1} live_dir=/{2}/LiveOS/ rootfstype=auto ro liveimg quiet rhgb rd_NO_LUKS rd_NO_MD rd_NO_DM xdriver=vesa nomodeset\n'.format(small_iso_basename, targetname, iso_basename))            
             bvt.write('\n')
 
-            # And last, we write out the verify entry
-            verifyentries = True
-            vt.write('label {0}_verify\n'.format(iso_basename))
-            vt.write('  menu label Verify and Boot {0}\n'.format(pretty_iso_basename))
-            if counter == bootdefaultnum:
-                vt.write('  menu default\n')
-            # Note that we only need the small_iso_basename for pathing that isolinux will use (kernel and initrd path). All other pathing should use iso_basename.
-            vt.write('  kernel /{0}/isolinux/vmlinuz0\n'.format(small_iso_basename))
-            vt.write('  append initrd=/{0}/isolinux/initrd0.img root=live:CDLABEL={1} live_dir=/{2}/LiveOS/ rootfstype=auto ro liveimg quiet rhgb rd_NO_LUKS rd_NO_MD rd_NO_DM check\n'.format(small_iso_basename, targetname, iso_basename))
-            vt.write('\n')
-
             makehelperdirs(imagedir, iso_basename, "isolinux", verbose)
-            checksum_name = '{0}-CHECKSUM'.format(iso_basename)
-            checksum_file = os.path.join(isodir, checksum_name)
-            if os.path.isfile(checksum_file):
-                if verbose:
-                    print 'Copying {0} checksum file to {1}.'.format(checksum_file, os.path.join(imagedir, iso_basename, 'CHECKSUM/'))
-                shutil.copy2(checksum_file, os.path.join(imagedir, iso_basename, 'CHECKSUM/'))
-            else:
-                print 'Could not locate {0} in isodir ({1}). Continuing, but {2} will always fail verification.\n'.format(checksum_name, isodir, iso_basename)
 
         else:
             # Not a Live ISO.
@@ -309,19 +280,9 @@ def makeisolinuximage(isolist, imagedir, mountdir, timeout, bootdefaultnum, targ
             bvt.write('  append initrd=/{0}/isolinux/initrd.img repo=hd:LABEL={1}:/{2} xdriver=vesa nomodeset\n'.format(small_iso_basename, targetname, iso_basename))
             bvt.write('\n')
 
-            # Only Live ISOs have a verify mode as a command line option. Non-Live ISOs always prompt to check in anaconda.
-            # So we don't need to write anything to vt here.
-
             if verbose:
                 print 'Copying {0} into {1}.'.format(iso, os.path.join(imagedir, iso_basename))
             shutil.copy2(iso, os.path.join(imagedir, iso_basename))
-            # Figure out what the CHECKSUM name should be
-            p = re.compile( '(DVD)')
-            checksum_name = p.sub( 'CHECKSUM', iso_basename)
-            for checksum in glob.glob('{0}*'.format(checksum_name)):
-                if verbose:
-                    print 'Copying {0} checksum file to {1}.'.format(checksum, os.path.join(imagedir, iso_basename, 'CHECKSUM/'))
-                shutil.copy2(checksum, os.path.join(imagedir, iso_basename, 'CHECKSUM/'))
         # Unmount the iso
         unmount_command = 'umount "{0}"'.format(mountdir)
         result = os.system(unmount_command)
@@ -346,15 +307,7 @@ def makeisolinuximage(isolist, imagedir, mountdir, timeout, bootdefaultnum, targ
     masterconf.write('menu end\n')
     masterconf.write('\n')
 
-    # Write the footers for the menus in vt and bvt
-    vt.write('menu separator\n')
-    vt.write('\n')
-    vt.write('label return\n')
-    vt.write('  menu label Return to main menu...\n')
-    vt.write('  menu exit\n')
-    vt.write('\n')
-    vt.write('menu end\n')
-
+    # Write the footer for the menus in bvt
     bvt.write('menu separator\n')
     bvt.write('\n')
     bvt.write('label return\n')
@@ -363,21 +316,15 @@ def makeisolinuximage(isolist, imagedir, mountdir, timeout, bootdefaultnum, targ
     bvt.write('\n')
     bvt.write('menu end\n')
 
-    # We are now done writing to vt and bvt
-    vt.close()
+    # We are now done writing to bvt
     bvt.close()
 
     # We will always have bvt entries, so write them to the master file now.
     masterconf.write(open(bvtfile).read())
 
-    # We might not have vt entries, check to see if we got any first.
-    if verifyentries:
-        masterconf.write(open(vtfile).read())
-
-    # At this point, we no longer need matfile, ffile, vtfile or bvtfile, and we don't want them written on the image
+    # At this point, we no longer need matfile, ffile or bvtfile, and we don't want them written on the image
     os.remove(matfile)
     os.remove(ffile)
-    os.remove(vtfile)
     os.remove(bvtfile)
 
     # Here's our master footer.
@@ -474,22 +421,11 @@ def makegrubimage(isolist, imagedir, mountdir, timeout, bootdefaultnum, grubarch
 	    if verbose:
 		print 'Copying {0} into {1}.'.format(iso, os.path.join(imagedir, iso_basename))
 	    shutil.copy2(iso, os.path.join(imagedir, iso_basename))
-	    # Figure out what the CHECKSUM name should be
-	    p = re.compile( '(DVD)')
-	    checksum_name = p.sub( 'CHECKSUM', iso_basename)
-	    for checksum in glob.glob('{0}*'.format(checksum_name)):
-		if verbose:
-		    print 'Copying {0} checksum file to {1}.'.format(checksum, os.path.join(imagedir, iso_basename, 'CHECKSUM/'))
-		shutil.copy2(checksum, os.path.join(imagedir, iso_basename, 'CHECKSUM/'))
         # Unmount the iso 
         unmount_command = 'umount "{0}"'.format(mountdir)
         result = os.system(unmount_command)
         if result:
             sys.exit('I tried to run {0}, but it failed. Exiting.'.format(unmount_command))
-
-    if os.path.isfile(os.path.join(grubdir, 'submenu.lst')):
-        f.write('title Verify Live Media\n')
-        f.write('    configfile /boot/grub/submenu.lst\n')
 
     # We're done writing to the grub file!
     f.close()
