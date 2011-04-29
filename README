@@ -25,6 +25,4 @@ Please note, this is a single line command, I've just split it up to make this
 README more friendly. If you run multiboot-media-creator.py 
 
 == TODO List ==
-* Disable verification entries (they don't work because you can't verify 
-either live or non-live entries in a multiboot layout).
 * Add better tiered menus for the individual arch entries in a multiarch layout

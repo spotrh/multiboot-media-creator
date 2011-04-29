@@ -99,9 +99,29 @@ def makeisolinuximage(isolist, imagedir, mountdir, timeout, bootdefaultnum, targ
     masterconf.write('menu color scrollbar 0 #ffffffff #00000000\n')
     masterconf.write('\n')
 
-    # This file is where we store the normal target entries
-    ffile = os.path.join(imagedir, 'normaltargets.part')
-    f = open(ffile, 'w')
+    # If multiarch mode is enabled, we need two (maybe three) files. 
+    if multiarch:
+       # This file is where we store the normal 32bit target entries
+       f32file = os.path.join(imagedir, 'normal32targets.part')
+       f32 = open(f32file, 'w')
+       f32.write('menu begin\n')
+       f32.write('menu title i386\n')
+
+       # This file is where we store the normal 64bit target entries
+       f64file = os.path.join(imagedir, 'normal64targets.part')
+       f64 = open(f64file, 'w')
+       f64.write('menu begin\n')
+       f64.write('menu title x86_64\n')
+
+       # This file is where we put any unpaired entries
+       fnopairentries = False
+       fnopairfile = os.path.join(imagedir, 'normalnopairtargets.part')
+       fnopair = open(fnopairfile, 'w')
+
+    else:
+       # This file is where we store all normal target entries
+       ffile = os.path.join(imagedir, 'normaltargets.part')
+       f = open(ffile, 'w')
 
     # This file is where we store the isolinux config bits for Live Images
     bvtfile = os.path.join(imagedir, 'basicvideotargets.part')
@@ -192,7 +212,7 @@ def makeisolinuximage(isolist, imagedir, mountdir, timeout, bootdefaultnum, targ
                 pairname = re.sub(r'i[3456]+86-', '', iso_basename)
                 pretty_pairname = re.sub(r'-', ' ', pairname)
 		mat.write('label {0}\n'.format(pairname))
-                mat.write('  menu label Autoselect x86_64 / i686 {0}\n'.format(pretty_pairname))
+                mat.write('  menu label Boot {0}\n'.format(pretty_pairname))
                 mat.write('  kernel ifcpu64.c32\n')
                 # This only works if the ia32 target is set as the default, since it it will trigger the target creation.
                 if counter == bootdefaultnum:
@@ -205,19 +225,71 @@ def makeisolinuximage(isolist, imagedir, mountdir, timeout, bootdefaultnum, targ
 	    # Write out non-multiboot items
             if verbose:
                 print 'Writing ISO specific entry for {0} into isolinux configs.'.format(iso_basename)
-            f.write('label {0}\n'.format(iso_basename))
-            f.write('  menu label Boot {0}\n'.format(pretty_iso_basename))
-            if counter == bootdefaultnum:
-                if pairedtarget_is_default:
-                   # The paired target inherited the default setting, so we don't set it here.
-                   if verbose:
-                      print 'Since the default is in the paired target, we are not setting this individual item as the default.'
-                else:
-                   f.write('  menu default\n')
-            # Note that we only need the small_iso_basename for pathing that isolinux will use (kernel and initrd path). All other pathing should use iso_basename.
-            f.write('  kernel /{0}/isolinux/vmlinuz0\n'.format(small_iso_basename))
-            f.write('  append initrd=/{0}/isolinux/initrd0.img root=live:CDLABEL={1} live_dir=/{2}/LiveOS/ rootfstype=auto ro liveimg quiet rhgb rd_NO_LUKS rd_NO_MD rd_NO_DM\n'.format(small_iso_basename, targetname, iso_basename))
-            f.write('\n')
+
+
+            # If multiarch is enabled
+            if multiarch:
+                # And we found a pair, then write out to the split files, and pop the x86_64 item off the list.
+                if pairfound:
+                    f32.write('label {0}\n'.format(iso_basename))
+                    f32.write('  menu label Boot {0}\n'.format(pretty_iso_basename))
+                    # Note that we only need the small_iso_basename for pathing that isolinux will use (kernel and initrd path). All other pathing should use iso_basename.
+                    f32.write('  kernel /{0}/isolinux/vmlinuz0\n'.format(small_iso_basename))
+                    f32.write('  append initrd=/{0}/isolinux/initrd0.img root=live:CDLABEL={1} live_dir=/{2}/LiveOS/ rootfstype=auto ro liveimg quiet rhgb rd_NO_LUKS rd_NO_MD rd_NO_DM\n'.format(small_iso_basename, targetname, iso_basename))
+                    f32.write('\n')
+
+                    pretty_x86_64_iso_basename = re.sub(r'-', ' ', x86_64_iso_basename)
+                    # isolinux can't read directories or files longer than 31 characters.
+                    # Truncate if we need to. (Yes, this could cause issues. :P)
+                    if len(x86_64_iso_basename) > 31:
+                        small_x86_64_iso_basename = x86_64_iso_basename[:31]
+                        if verbose:
+                            print '{0} is {1}, this is longer than the isolinux 31 character max.'.format(x86_64_iso_basename, len(x86_64_iso_basename))
+                            print 'In the isolinux.cfg, we will refer to it as {0}.'.format(small_x86_64_iso_basename)
+                    else:
+                        small_x86_64_iso_basename = x86_64_iso_basename
+
+                    f64.write('label {0}\n'.format(x86_64_iso_basename))
+                    f64.write('  menu label Boot {0}\n'.format(pretty_x86_64_iso_basename))
+                    # Note that we only need the small_x86_64_iso_basename for pathing that isolinux will use (kernel and initrd path). All other pathing should use x86_64_iso_basename.
+                    f64.write('  kernel /{0}/isolinux/vmlinuz0\n'.format(small_x86_64_iso_basename))
+                    f64.write('  append initrd=/{0}/isolinux/initrd0.img root=live:CDLABEL={1} live_dir=/{2}/LiveOS/ rootfstype=auto ro liveimg quiet rhgb rd_NO_LUKS rd_NO_MD rd_NO_DM\n'.format(small_x86_64_iso_basename, targetname, x86_64_iso_basename))
+                    f64.write('\n')
+                    # Now, pull x86_64_iso out of 'isolist'
+                    try:
+                        isolist.remove(x86_64_iso)
+                    except:
+                        sys.exit('Tried to remove {0} from the isolist, but I failed. Exiting.'.format(x86_64_iso)
+                    # Shift the bootdefaultnum if we need to, to reflect that the list size has changed
+                    if bootdefaultnum > counter + 1:
+                        bootdefaultnum = bootdefaultnum - 1 
+
+               # ... but we didn't find a pair, then write to the nopairfile (and indicate that we needed to)
+               else: 
+                    fnopairentries = True
+
+
+               ia32_pattern = re.compile('i[3456]+86')
+            if ia32_pattern.search(iso):
+                if verbose:
+                    print '{0} matches the i[3456]+86 pattern, looking for the x86_64 partner...'.format(iso)
+
+
+            # Multiarch disabled
+            else:
+                f.write('label {0}\n'.format(iso_basename))
+                f.write('  menu label Boot {0}\n'.format(pretty_iso_basename))
+                if counter == bootdefaultnum:
+                    if pairedtarget_is_default:
+                        # The paired target inherited the default setting, so we don't set it here.
+                        if verbose:
+                            print 'Since the default is in the paired target, we are not setting this individual item as the default.'
+                    else:
+                        f.write('  menu default\n')
+                # Note that we only need the small_iso_basename for pathing that isolinux will use (kernel and initrd path). All other pathing should use iso_basename.
+                f.write('  kernel /{0}/isolinux/vmlinuz0\n'.format(small_iso_basename))
+                f.write('  append initrd=/{0}/isolinux/initrd0.img root=live:CDLABEL={1} live_dir=/{2}/LiveOS/ rootfstype=auto ro liveimg quiet rhgb rd_NO_LUKS rd_NO_MD rd_NO_DM\n'.format(small_iso_basename, targetname, iso_basename))
+                f.write('\n')
 
             # Now, we write out the basic video entry
             bvt.write('label {0}_basicvideo\n'.format(iso_basename))
