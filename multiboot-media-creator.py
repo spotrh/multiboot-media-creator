@@ -48,7 +48,7 @@ def makehelperdirs(imagedir, iso_basename, type, verbose):
                 error = sys.exc_info()[1]
                 sys.exit('I was trying to make an image directory as {0}, but I failed with error {1}. Exiting.'.format(os.makedirs(os.path.join(imagedir, iso_basename, dir)), error))
 
-def makeisolinuximage(isolist, imagedir, mountdir, timeout, bootdefaultnum, targetiso, targetname, isolinuxsplash, isodir, nomultiarch, verbose):
+def makeisolinuximage(isolist, imagedir, mountdir, timeout, bootdefaultiso, targetiso, targetname, isolinuxsplash, isodir, nomultiarch, verbose):
     # If the nomultiarch flag is set to true, disable multiarch. Otherwise, enable multiarch.
     if nomultiarch:
        multiarch = False
@@ -214,18 +214,16 @@ def makeisolinuximage(isolist, imagedir, mountdir, timeout, bootdefaultnum, targ
 		mat.write('label {0}\n'.format(pairname))
                 mat.write('  menu label Boot {0}\n'.format(pretty_pairname))
                 mat.write('  kernel ifcpu64.c32\n')
-                # This only works if the ia32 target is set as the default, since it it will trigger the target creation.
-                if counter == bootdefaultnum:
+                if bootdefaultiso == iso:
                     mat.write('  menu default\n')
-                    # We need to know that we set the paired target as the default
-                    pairedtarget_is_default = True
+                if bootdefaultiso == x86_64_iso:
+                    mat.write('  menu default\n')
                 mat.write('  append {0} -- {1}\n'.format(x86_64_iso_basename, iso_basename))
                 mat.write('\n')
 
 	    # Write out non-multiboot items
             if verbose:
-                print 'Writing ISO specific entry for {0} into isolinux configs.'.format(iso_basename)
-
+                print 'Writing ISO specific entry for {0} and {1} into isolinux configs.'.format(iso_basename, x86_64_iso_basename)
 
             # If multiarch is enabled
             if multiarch:
@@ -237,6 +235,18 @@ def makeisolinuximage(isolist, imagedir, mountdir, timeout, bootdefaultnum, targ
                     f32.write('  kernel /{0}/isolinux/vmlinuz0\n'.format(small_iso_basename))
                     f32.write('  append initrd=/{0}/isolinux/initrd0.img root=live:CDLABEL={1} live_dir=/{2}/LiveOS/ rootfstype=auto ro liveimg quiet rhgb rd_NO_LUKS rd_NO_MD rd_NO_DM\n'.format(small_iso_basename, targetname, iso_basename))
                     f32.write('\n')
+
+                    if verbose:
+                        print 'Unmounting {0}, and mounting {1} to copy second half of pair to {2}.'.format(iso, x86_64_iso, os.path.join(imagedir, x86_64_iso_basename))
+                    unmount_command = 'umount "{0}"'.format(mountdir)
+                    result = os.system(unmount_command)
+                    if result:
+                        sys.exit('I tried to run {0}, but it failed. Exiting.'.format(unmount_command))
+                    mount_command = 'mount -o loop "{0}" "{1}"'.format(x86_64_iso, mountdir)
+                    result = os.system(mount_command)
+                    if result:
+                        sys.exit('I tried to run {0}, but it failed. Exiting.'.format(mount_command))
+                    shutil.copytree(mountdir, os.path.join(imagedir, x86_64_iso_basename))  
 
                     pretty_x86_64_iso_basename = re.sub(r'-', ' ', x86_64_iso_basename)
                     # isolinux can't read directories or files longer than 31 characters.
@@ -259,33 +269,26 @@ def makeisolinuximage(isolist, imagedir, mountdir, timeout, bootdefaultnum, targ
                     try:
                         isolist.remove(x86_64_iso)
                     except:
-                        sys.exit('Tried to remove {0} from the isolist, but I failed. Exiting.'.format(x86_64_iso)
-                    # Shift the bootdefaultnum if we need to, to reflect that the list size has changed
-                    if bootdefaultnum > counter + 1:
-                        bootdefaultnum = bootdefaultnum - 1 
+                        sys.exit('Tried to remove {0} from the isolist, but I failed. Exiting.'.format(x86_64_iso))
 
-               # ... but we didn't find a pair, then write to the nopairfile (and indicate that we needed to)
-               else: 
+                # ... but we didn't find a pair, then write to the nopairfile (and indicate that we needed to)
+                else:
                     fnopairentries = True
-
-
-               ia32_pattern = re.compile('i[3456]+86')
-            if ia32_pattern.search(iso):
-                if verbose:
-                    print '{0} matches the i[3456]+86 pattern, looking for the x86_64 partner...'.format(iso)
-
+                    fnopair.write('label {0}\n'.format(iso_basename))
+                    fnopair.write('  menu label Boot {0}\n'.format(pretty_iso_basename))
+                    if bootdefaultiso == iso:
+                        fnopair.write('  menu default\n')
+                    # Note that we only need the small_iso_basename for pathing that isolinux will use (kernel and initrd path). All other pathing should use iso_basename.
+                    fnopair.write('  kernel /{0}/isolinux/vmlinuz0\n'.format(small_iso_basename))
+                    fnopair.write('  append initrd=/{0}/isolinux/initrd0.img root=live:CDLABEL={1} live_dir=/{2}/LiveOS/ rootfstype=auto ro liveimg quiet rhgb rd_NO_LUKS rd_NO_MD rd_NO_DM\n'.format(small_iso_basename, targetname, iso_basename))
+                    fnopair.write('\n')
 
             # Multiarch disabled
             else:
                 f.write('label {0}\n'.format(iso_basename))
                 f.write('  menu label Boot {0}\n'.format(pretty_iso_basename))
-                if counter == bootdefaultnum:
-                    if pairedtarget_is_default:
-                        # The paired target inherited the default setting, so we don't set it here.
-                        if verbose:
-                            print 'Since the default is in the paired target, we are not setting this individual item as the default.'
-                    else:
-                        f.write('  menu default\n')
+                if bootdefaultiso == iso:
+                    f.write('  menu default\n')
                 # Note that we only need the small_iso_basename for pathing that isolinux will use (kernel and initrd path). All other pathing should use iso_basename.
                 f.write('  kernel /{0}/isolinux/vmlinuz0\n'.format(small_iso_basename))
                 f.write('  append initrd=/{0}/isolinux/initrd0.img root=live:CDLABEL={1} live_dir=/{2}/LiveOS/ rootfstype=auto ro liveimg quiet rhgb rd_NO_LUKS rd_NO_MD rd_NO_DM\n'.format(small_iso_basename, targetname, iso_basename))
@@ -294,12 +297,23 @@ def makeisolinuximage(isolist, imagedir, mountdir, timeout, bootdefaultnum, targ
             # Now, we write out the basic video entry
             bvt.write('label {0}_basicvideo\n'.format(iso_basename))
             bvt.write('  menu label {0} (Basic Video)\n'.format(pretty_iso_basename))
-            if counter == bootdefaultnum:
+            if bootdefaultiso == iso:
                 bvt.write('  menu default\n')
             # Note that we only need the small_iso_basename for pathing that isolinux will use (kernel and initrd path). All other pathing should use iso_basename.
             bvt.write('  kernel /{0}/isolinux/vmlinuz0\n'.format(small_iso_basename))
             bvt.write('  append initrd=/{0}/isolinux/initrd0.img root=live:CDLABEL={1} live_dir=/{2}/LiveOS/ rootfstype=auto ro liveimg quiet rhgb rd_NO_LUKS rd_NO_MD rd_NO_DM xdriver=vesa nomodeset\n'.format(small_iso_basename, targetname, iso_basename))            
             bvt.write('\n')
+
+            if pairfound:
+                # Write out the basic Video Entry for x86_64 too.
+                bvt.write('label {0}_basicvideo\n'.format(x86_64_iso_basename))
+                bvt.write('  menu label {0} (Basic Video)\n'.format(pretty_x86_64_iso_basename))
+                if bootdefaultiso == x86_64_iso:
+                    bvt.write('  menu default\n')
+                # Note that we only need the small_iso_basename for pathing that isolinux will use (kernel and initrd path). All other pathing should use iso_basename.
+                bvt.write('  kernel /{0}/isolinux/vmlinuz0\n'.format(small_iso_basename))
+                bvt.write('  append initrd=/{0}/isolinux/initrd0.img root=live:CDLABEL={1} live_dir=/{2}/LiveOS/ rootfstype=auto ro liveimg quiet rhgb rd_NO_LUKS rd_NO_MD rd_NO_DM xdriver=vesa nomodeset\n'.format(small_x86_64_iso_basename, targetname, x86_64_iso_basename))
+                bvt.write('\n')
 
             makehelperdirs(imagedir, iso_basename, "isolinux", verbose)
 
@@ -320,62 +334,195 @@ def makeisolinuximage(isolist, imagedir, mountdir, timeout, bootdefaultnum, targ
                 pairname = re.sub(r'i[3456]+86-', '', iso_basename)
                 pretty_pairname = re.sub(r'-', ' ', pairname)
                 mat.write('label {0}\n'.format(pairname))
-                mat.write('  menu label Autoselect x86_64 / i686 {0}\n'.format(pretty_pairname))
+                mat.write('  menu label Install {0}\n'.format(pretty_pairname))
                 mat.write('  kernel ifcpu64.c32\n')
-                # This only works if the ia32 target is set as the default, since it it will trigger the target creation.
-                if counter == bootdefaultnum:
+                if bootdefaultiso == iso: 
+                    mat.write('  menu default\n')
+                if bootdefaultiso == x86_64_iso:
                     mat.write('  menu default\n')
                 mat.write('  append {0} -- {1}\n'.format(x86_64_iso_basename, iso_basename))
                 mat.write('\n')
 
-            f.write('label {0}\n'.format(iso_basename))
-            f.write('  menu label Install {0}\n'.format(pretty_iso_basename))
-            if counter == bootdefaultnum:
-                if pairedtarget_is_default:
-                   # The paired target inherited the default setting, so we don't set it here.
-                   if verbose:
-                      print 'Since the default is in the paired target, we are not setting this individual item as the default.'
+            # If multiarch is enabled
+            if multiarch:
+                # And we found a pair, then write out to the split files, and pop the x86_64 item off the list.
+                if pairfound:
+                    f32.write('label {0}\n'.format(iso_basename))
+                    f32.write('  menu label Install {0}\n'.format(pretty_iso_basename))
+                    # Note that we only need the small_iso_basename for pathing that isolinux will use (kernel and initrd path). All other pathing should use iso_basename.
+                    f32.write('  kernel /{0}/isolinux/vmlinuz\n'.format(small_iso_basename))
+                    f32.write('  append initrd=/{0}/isolinux/initrd.img repo=hd:LABEL={1}:/{2}/\n'.format(small_iso_basename, targetname, iso_basename))
+                    f32.write('\n')
+
+                    if verbose:
+                        print 'Copying second half of iso pair to {1}.'.format(x86_64_iso, os.path.join(imagedir, x86_64_iso_basename))
+                    unmount_command = 'umount "{0}"'.format(mountdir)
+                    result = os.system(unmount_command)
+                    if result:   
+                        sys.exit('I tried to run {0}, but it failed. Exiting.'.format(unmount_command))
+                    mount_command = 'mount -o loop "{0}" "{1}"'.format(x86_64_iso, mountdir)
+                    result = os.system(mount_command)
+                    if result:
+                        sys.exit('I tried to run {0}, but it failed. Exiting.'.format(mount_command))
+                    makehelperdirs(imagedir, x86_64_iso_basename, "isolinux", verbose)
+                    shutil.copy2(os.path.join(mountdir, 'isolinux/vmlinuz'), os.path.join(imagedir, x86_64_iso_basename, 'isolinux/vmlinuz'))
+                    shutil.copy2(os.path.join(mountdir, 'isolinux/initrd.img'), os.path.join(imagedir, x86_64_iso_basename, 'isolinux/initrd.img'))
+                    if os.path.isfile(os.path.join(mountdir, 'images/install.img')):
+                        shutil.copy2(os.path.join(mountdir, 'images/install.img'), os.path.join(imagedir, x86_64_iso_basename, 'images/install.img'))
+
+                    pretty_x86_64_iso_basename = re.sub(r'-', ' ', x86_64_iso_basename)
+                    # isolinux can't read directories or files longer than 31 characters.
+                    # Truncate if we need to. (Yes, this could cause issues. :P)
+                    if len(x86_64_iso_basename) > 31:
+                        small_x86_64_iso_basename = x86_64_iso_basename[:31]
+                        if verbose:
+                            print '{0} is {1}, this is longer than the isolinux 31 character max.'.format(x86_64_iso_basename, len(x86_64_iso_basename))
+                            print 'In the isolinux.cfg, we will refer to it as {0}.'.format(small_x86_64_iso_basename)
+                    else:
+                        small_x86_64_iso_basename = x86_64_iso_basename
+
+                    f64.write('label {0}\n'.format(x86_64_iso_basename))
+                    f64.write('  menu label Install {0}\n'.format(pretty_x86_64_iso_basename))
+                    # Note that we only need the small_x86_64_iso_basename for pathing that isolinux will use (kernel and initrd path). All other pathing should use x86_64_iso_basename.
+                    f64.write('  kernel /{0}/isolinux/vmlinuz\n'.format(small_x86_64_iso_basename))
+                    f64.write('  append initrd=/{0}/isolinux/initrd.img repo=hd:LABEL={1}:/{2}/\n'.format(small_x86_64_iso_basename, targetname, x86_64_iso_basename))
+                    f64.write('\n')
+                    # Now, pull x86_64_iso out of 'isolist'
+                    try:
+                        isolist.remove(x86_64_iso)
+                    except:
+                        sys.exit('Tried to remove {0} from the isolist, but I failed. Exiting.'.format(x86_64_iso))
+
+                # ... but we didn't find a pair, then write to the nopairfile (and indicate that we needed to)
                 else:
-                   f.write('  menu default\n')
-            f.write('  kernel /{0}/isolinux/vmlinuz\n'.format(small_iso_basename))
-            # Note that	we only	need the small_iso_basename for	pathing	that isolinux will use (kernel and initrd path). All other pathing should use iso_basename.
-            f.write('  append initrd=/{0}/isolinux/initrd.img repo=hd:LABEL={1}:/{2}/\n'.format(small_iso_basename, targetname, iso_basename))
-            f.write('\n')
+                    fnopairentries = True
+                    fnopair.write('label {0}\n'.format(iso_basename))
+                    fnopair.write('  menu label Install {0}\n'.format(pretty_iso_basename))
+                    if bootdefaultiso == iso:
+                        fnopair.write('  menu default\n')
+                    # Note that we only need the small_iso_basename for pathing that isolinux will use (kernel and initrd path). All other pathing should use iso_basename.
+                    fnopair.write('  kernel /{0}/isolinux/vmlinuz\n'.format(small_iso_basename))
+                    fnopair.write('  append initrd=/{0}/isolinux/initrd.img repo=hd:LABEL={1}:/{2}/\n'.format(small_iso_basename, targetname, iso_basename))
+                    fnopair.write('\n')
+
+            # Multiarch disabled
+            else:
+                f.write('label {0}\n'.format(iso_basename))
+                f.write('  menu label Install {0}\n'.format(pretty_iso_basename))
+                if bootdefaultiso == iso:
+                    f.write('  menu default\n')
+                f.write('  kernel /{0}/isolinux/vmlinuz\n'.format(small_iso_basename))
+                # Note that we only need the small_iso_basename for pathing that isolinux will use (kernel and initrd path). All other pathing should use iso_basename.
+                f.write('  append initrd=/{0}/isolinux/initrd.img repo=hd:LABEL={1}:/{2}/\n'.format(small_iso_basename, targetname, iso_basename))
+                f.write('\n')
 
             # Now, we write out the basic video entry
             bvt.write('label {0}_basicvideo\n'.format(iso_basename))
             bvt.write('  menu label {0} (Basic Video)\n'.format(pretty_iso_basename))
-            if counter == bootdefaultnum:
+            if bootdefaultiso == iso:
                 bvt.write('  menu default\n')
             # Note that we only need the small_iso_basename for pathing that isolinux will use (kernel and initrd path). All other pathing should use iso_basename.
             bvt.write('  kernel /{0}/isolinux/vmlinuz\n'.format(small_iso_basename))
             bvt.write('  append initrd=/{0}/isolinux/initrd.img repo=hd:LABEL={1}:/{2} xdriver=vesa nomodeset\n'.format(small_iso_basename, targetname, iso_basename))
             bvt.write('\n')
 
+            if pairfound:
+                # Write out the basic Video Entry for x86_64 too.
+                bvt.write('label {0}_basicvideo\n'.format(x86_64_iso_basename))
+                bvt.write('  menu label {0} (Basic Video)\n'.format(pretty_x86_64_iso_basename))
+                if bootdefaultiso == x86_64_iso:
+                    bvt.write('  menu default\n')
+                # Note that we only need the small_x86_64_iso_basename for pathing that isolinux will use (kernel and initrd path). All other pathing should use x86_64_iso_basename.
+                bvt.write('  kernel /{0}/isolinux/vmlinuz\n'.format(small_x86_64_iso_basename))
+                bvt.write('  append initrd=/{0}/isolinux/initrd.img repo=hd:LABEL={1}:/{2} xdriver=vesa nomodeset\n'.format(small_x86_64_basename, targetname, x86_64_iso_basename))
+                bvt.write('\n')
+
             if verbose:
                 print 'Copying {0} into {1}.'.format(iso, os.path.join(imagedir, iso_basename))
             shutil.copy2(iso, os.path.join(imagedir, iso_basename))
+
+            if pairfound:
+                if verbose:
+                     print 'Copying {0} into {1}.'.format(x86_64_iso, os.path.join(imagedir, x86_64_iso_basename))
+                shutil.copy2(x86_64_iso, os.path.join(imagedir, x86_64_iso_basename))
+
         # Unmount the iso
         unmount_command = 'umount "{0}"'.format(mountdir)
         result = os.system(unmount_command)
         if result:
             sys.exit('I tried to run {0}, but it failed. Exiting.'.format(unmount_command))
 
-    # We're now done writing to the multiboot and normal configs
+    # We're now done writing to the multiboot config
     mat.close()
-    f.close()
+
+    # We don't need any other changes to fnopair, close it.
+    if multiarch:
+        fnopair.close()
+
+    # Close out the multiarch config menus and close them, if in multiarch mode.
+    if multiarch and multiarchentries:
+        f32.write('menu separator\n')
+        f32.write('\n')
+        f32.write('label return\n')
+        f32.write('menu label Return to architecture menu...\n') 
+        f32.write('         menu exit\n')
+        f32.write('\n')
+        f32.write('menu end\n')
+        f32.write('\n')
+        f32.close()
+        f64.write('menu separator\n')
+        f64.write('\n')
+        f64.write('label return\n')
+        f64.write('menu label Return to architecture menu...\n')
+        f64.write('         menu exit\n')
+        f64.write('\n')
+        f64.write('menu end\n')
+        f64.write('\n')
+        f64.close()
 
     # Now, we need to append mat to the master config file
     # But only if we found some multiarch entries
     if multiarchentries:
         masterconf.write(open(matfile).read())
 
-    # Now, add the normal entries to the master config file
-    masterconf.write(open(ffile).read())
+    # Next, we need to merge in any unpaired entries found in multiarch mode
+    if fnopairentries:
+        masterconf.write(open(fnopairfile).read())
 
-    # Add the separator in the master config
-    masterconf.write('menu separator\n')
-    masterconf.write('\n')
+
+
+    # Now, write out the Select Architecture menu. 
+    # We use the f32 and f64 entries.
+    if multiarch and multiarchentries:
+        # Add the separator in the master config
+        masterconf.write('menu separator\n')
+        masterconf.write('\n')
+
+        masterconf.write('menu begin\n')
+        masterconf.write('menu title Select Specific Architecture\n')
+        masterconf.write('\n')
+        masterconf.write(open(f32file).read())
+        masterconf.write(open(f64file).read())
+        masterconf.write('menu separator\n')
+        masterconf.write('\n')
+        masterconf.write('label return\n')
+        masterconf.write('         menu label Return to main menu...\n')
+        masterconf.write('         menu exit\n')
+        masterconf.write('\n')
+        masterconf.write('menu end\n')
+    else:
+        if multiarch:
+            # Getting here means we are in multiarch mode but we found no valid pairs. Do nothing.
+            if verbose:
+                print 'You enabled multiarch mode, but there were no valid multiarch pairs... maybe you did something wrong?'
+        else:
+            # Getting here means we're not in multiarch mode, so we just write out normal entries from ffile.
+            masterconf.write(open(ffile).read())
+            # Add the separator in the master config
+            masterconf.write('menu separator\n')
+            masterconf.write('\n')
+
+    # End the "loose" entries menu in the master config
     masterconf.write('menu end\n')
     masterconf.write('\n')
 
@@ -394,10 +541,17 @@ def makeisolinuximage(isolist, imagedir, mountdir, timeout, bootdefaultnum, targ
     # We will always have bvt entries, so write them to the master file now.
     masterconf.write(open(bvtfile).read())
 
-    # At this point, we no longer need matfile, ffile or bvtfile, and we don't want them written on the image
+    # At this point, we no longer need matfile or bvtfile, and we don't want them written on the image
     os.remove(matfile)
-    os.remove(ffile)
     os.remove(bvtfile)
+
+    # Same thing is true for the multiarch files (or the non multiarch ffile).
+    if multiarch:
+        os.remove(f32file)
+        os.remove(f64file)
+        os.remove(fnopairfile)
+    else:
+        os.remove(ffile)
 
     # Here's our master footer.
     masterconf.write('\n')
@@ -718,6 +872,10 @@ if __name__ == '__main__':
            else:
                # Bail out since I can't find the boot
                sys.exit('Could not find the specified bootdefault ISO ({}) in the list of ISOs. Exiting.'.format(args.bootdefault))
+        bootdefaultiso = args.bootdefault
+    else:
+        bootdefaultiso = isolist[0]
+        
 
     if args.verbose:
 	print 'Here are the ISOs that I am going to add:'
@@ -743,4 +901,4 @@ if __name__ == '__main__':
                  print 'Found /usr/share/syslinux/isolinux.bin. Assuming syslinux is installed properly'
         else:
             sys.exit('Could not find /usr/share/syslinux/isolinux.bin ? Perhaps syslinux is not installed?')
-	makeisolinuximage(isolist, args.imagedir, args.mountdir, args.timeout, bootdefaultnum, args.target, args.targetname, args.isolinuxsplash, args.isodir, args.nomultiarch, args.verbose)
+	makeisolinuximage(isolist, args.imagedir, args.mountdir, args.timeout, bootdefaultiso, args.target, args.targetname, args.isolinuxsplash, args.isodir, args.nomultiarch, args.verbose)

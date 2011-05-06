@@ -22,7 +22,9 @@ sudo ./multiboot-media-creator.py --isos Fedora-15-Beta-*-Live-*.iso -v \
 --target Fedora-15-Beta-Multi-Boot.iso --targetname Fedora-15-Beta-Multi-Boot
 
 Please note, this is a single line command, I've just split it up to make this 
-README more friendly. If you run multiboot-media-creator.py 
+README more friendly. If you run multiboot-media-creator.py --help, it will show
+all the valid options. I strongly recommend running with -v.
 
 == TODO List ==
-* Add better tiered menus for the individual arch entries in a multiarch layout
+* Clean up code to minimize duplication and confusion.
+* Add size check and print warning if ISO is bigger than max size for DVD-DL
