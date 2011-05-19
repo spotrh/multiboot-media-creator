@@ -49,6 +49,14 @@ def makehelperdirs(imagedir, iso_basename, type, verbose):
                 sys.exit('I was trying to make an image directory as {0}, but I failed with error {1}. Exiting.'.format(os.makedirs(os.path.join(imagedir, iso_basename, dir)), error))
 
 def makeisolinuximage(isolist, imagedir, mountdir, timeout, bootdefaultiso, targetiso, targetname, isolinuxsplash, isodir, nomultiarch, verbose):
+    # Second Sanity Check
+    # Memtest86+ test
+    memtest_list = glob.glob('/boot/memtest86+-*')
+    if memtest_list:
+        memtest_binary = memtest_list[0]
+    else:
+        sys.exit('Could not find memtest86+ binary in /boot ? Perhaps memtest86+ is not installed?')           
+
     # If the nomultiarch flag is set to true, disable multiarch. Otherwise, enable multiarch.
     if nomultiarch:
        multiarch = False
@@ -74,6 +82,11 @@ def makeisolinuximage(isolist, imagedir, mountdir, timeout, bootdefaultiso, targ
     if verbose:
        print 'Copying {0} splash file to {1}.'.format(isolinuxsplash, isolinuxdir)
     shutil.copy2(isolinuxsplash, isolinuxdir)
+
+    # Copy memtest86+ binary over
+    if verbose:
+	print 'Copying {0} memtest86+ kernel to {1}.'.format(memtest_binary, os.path.join(isolinuxdir, 'memtest'))
+    shutil.copy2(memtest_binary, os.path.join(isolinuxdir, 'memtest'))
 
     # Open our master config file.
     masterconf = open(isolinuxconf, 'w')
@@ -434,7 +447,7 @@ def makeisolinuximage(isolist, imagedir, mountdir, timeout, bootdefaultiso, targ
                     bvt.write('  menu default\n')
                 # Note that we only need the small_x86_64_iso_basename for pathing that isolinux will use (kernel and initrd path). All other pathing should use x86_64_iso_basename.
                 bvt.write('  kernel /{0}/isolinux/vmlinuz\n'.format(small_x86_64_iso_basename))
-                bvt.write('  append initrd=/{0}/isolinux/initrd.img repo=hd:LABEL={1}:/{2} xdriver=vesa nomodeset\n'.format(small_x86_64_basename, targetname, x86_64_iso_basename))
+                bvt.write('  append initrd=/{0}/isolinux/initrd.img repo=hd:LABEL={1}:/{2} xdriver=vesa nomodeset\n'.format(small_x86_64_iso_basename, targetname, x86_64_iso_basename))
                 bvt.write('\n')
 
             if verbose:
