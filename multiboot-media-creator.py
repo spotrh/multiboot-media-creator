@@ -321,7 +321,7 @@ def makeisolinuximage(isolist, imagedir, mountdir, timeout, bootdefaultiso, targ
                 # Write out the basic Video Entry for x86_64 too.
                 bvt.write('label {0}_basicvideo\n'.format(x86_64_iso_basename))
                 bvt.write('  menu label {0} (Basic Video)\n'.format(pretty_x86_64_iso_basename))
-'                if bootdefaultiso == x86_64_iso:
+                if bootdefaultiso == x86_64_iso:
                     bvt.write('  menu default\n')
                 # Note that we only need the small_iso_basename for pathing that isolinux will use (kernel and initrd path). All other pathing should use iso_basename.
                 bvt.write('  kernel /{0}/isolinux/vmlinuz0\n'.format(small_x86_64_iso_basename))
