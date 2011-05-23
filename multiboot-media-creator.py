@@ -765,8 +765,8 @@ if __name__ == '__main__':
     parser.add_argument('--isodir', nargs = '?', default = os.curdir,
                         help = 'System Directory where source ISOs (and CHECKSUM files) are stored. Defaults to .')
 
-    parser.add_argument('--isolinuxsplash', nargs = 1, default = '/usr/lib/anaconda-runtime/syslinux-vesa-splash.jpg',
-                        help = 'Full path to isolinux splash image. Defaults to /usr/lib/anaconda-runtime/syslinux-vesa-splash.jpg')
+    parser.add_argument('--isolinuxsplash', nargs = 1, default = '/usr/share/anaconda/boot/syslinux-vesa-splash.jpg',
+                        help = 'Full path to isolinux splash image. Defaults to /usr/share/anaconda/boot/syslinux-vesa-splash.jpg')
 
     parser.add_argument('--mountdir', nargs = '?', default = os.path.join(os.curdir, 'mnt'),
                         help = 'Working directory for temporarily mounting source ISOs. Defaults to {0}'.format(os.path.join(os.curdir, 'mnt'))) 
