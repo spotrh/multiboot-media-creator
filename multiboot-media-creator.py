@@ -24,6 +24,7 @@ import re
 import shutil
 import subprocess
 import sys
+import time
 
 name = 'Multiboot Media Creator'
 version = 0.6
@@ -259,6 +260,9 @@ def makeisolinuximage(isolist, imagedir, mountdir, timeout, bootdefaultiso, targ
                     if verbose:
                         print 'Unmounting {0}, and mounting {1} to copy second half of pair to {2}.'.format(iso, x86_64_iso, os.path.join(imagedir, x86_64_iso_basename))
                     unmount_command = 'umount "{0}"'.format(mountdir)
+                    if verbose:
+                        print 'Sleeping for 3 seconds here, otherwise we might try to umount while GNOME is still looking at it.'
+                    time.sleep(3)
                     result = os.system(unmount_command)
                     if result:
                         sys.exit('I tried to run {0}, but it failed. Exiting.'.format(unmount_command))
@@ -377,6 +381,9 @@ def makeisolinuximage(isolist, imagedir, mountdir, timeout, bootdefaultiso, targ
                     if verbose:
                         print 'Copying second half of iso pair to {1}.'.format(x86_64_iso, os.path.join(imagedir, x86_64_iso_basename))
                     unmount_command = 'umount "{0}"'.format(mountdir)
+                    if verbose:
+                        print 'Sleeping for 3 seconds here, otherwise we might try to umount while GNOME is still looking at it.'
+                    time.sleep(3)
                     result = os.system(unmount_command)
                     if result:   
                         sys.exit('I tried to run {0}, but it failed. Exiting.'.format(unmount_command))
