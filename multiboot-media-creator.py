@@ -24,9 +24,10 @@ import re
 import shutil
 import subprocess
 import sys
+import time
 
 name = 'Multiboot Media Creator'
-version = 0.6
+version = 0.7
 my_description = '{0} {1}'.format(name, version)
 
 def makeuefidirs(imagedir, verbose):
@@ -262,13 +263,20 @@ def makeisolinuximage(isolist, imagedir, mountdir, timeout, bootdefaultiso, targ
         result = os.system(mount_command)
         if result:
             sys.exit('I tried to run {0}, but it failed. Exiting.'.format(mount_command))
-        isolinux_config = open(os.path.join(mountdir, 'isolinux/isolinux.cfg'), 'r')
-        isolinux_config_text = isolinux_config.read()
-        isolinux_config.close()
-        search_string = 'live'
-        index = isolinux_config_text.find(search_string)
-        # If index is -1, then the search_string is not in the text.
-        if index >= 0:
+        # We used to check for "live" in the isolinux/isolinux.cfg, but all Fedora ISOs now
+        # pass that check, including the install media! Now, we just look for .discinfo. If it
+        # is present, we know we're not on a live ISO.
+        discinfo_file = os.path.join(mountdir, '.discinfo')
+        if os.path.isfile(discinfo_file):
+            if verbose:
+                print '{0} found. Must be an InstallISO.'.format(discinfo_file)
+            iso_type_live = False
+        else:
+            if verbose:
+                print '{0} _NOT_ found. Must be a LiveISO.'.format(discinfo_file)
+            iso_type_live = True
+
+        if iso_type_live:
             # Okay, this is a Live ISO.
             if verbose:
                 print '{0} is a Live ISO. Copying files to {1}.'.format(iso, os.path.join(imagedir, iso_basename))
@@ -328,6 +336,9 @@ def makeisolinuximage(isolist, imagedir, mountdir, timeout, bootdefaultiso, targ
                     if verbose:
                         print 'Unmounting {0}, and mounting {1} to copy second half of pair to {2}.'.format(iso, x86_64_iso, os.path.join(imagedir, x86_64_iso_basename))
                     unmount_command = 'umount "{0}"'.format(mountdir)
+                    if verbose:
+                        print 'Sleeping for 3 seconds here, otherwise we might try to umount while GNOME is still looking at it.'
+                    time.sleep(3)
                     result = os.system(unmount_command)
                     if result:
                         sys.exit('I tried to run {0}, but it failed. Exiting.'.format(unmount_command))
@@ -486,6 +497,9 @@ def makeisolinuximage(isolist, imagedir, mountdir, timeout, bootdefaultiso, targ
                     if verbose:
                         print 'Copying second half of iso pair to {1}.'.format(x86_64_iso, os.path.join(imagedir, x86_64_iso_basename))
                     unmount_command = 'umount "{0}"'.format(mountdir)
+                    if verbose:
+                        print 'Sleeping for 3 seconds here, otherwise we might try to umount while GNOME is still looking at it.'
+                    time.sleep(3)
                     result = os.system(unmount_command)
                     if result:   
                         sys.exit('I tried to run {0}, but it failed. Exiting.'.format(unmount_command))
@@ -751,13 +765,20 @@ def makegrubimage(isolist, imagedir, mountdir, timeout, bootdefaultnum, grubarch
         result = os.system(mount_command)
         if result:
 	    sys.exit('I tried to run {0}, but it failed. Exiting.'.format(mount_command))
-        isolinux_config = open(os.path.join(mountdir, 'isolinux/isolinux.cfg'), 'r')
-	isolinux_config_text = isolinux_config.read()
-	isolinux_config.close()
-	search_string = 'live'
-	index = isolinux_config_text.find(search_string)
-	# If index is -1, then the search_string is not in the text.
-	if index >= 0:
+        # We used to check for "live" in the isolinux/isolinux.cfg, but all Fedora ISOs now
+        # pass that check, including the install media! Now, we just look for .discinfo. If it
+        # is present, we know we're not on a live ISO.
+        discinfo_file = os.path.join(mountdir, '.discinfo')
+        if os.path.isfile(discinfo_file):
+            if verbose:
+                print '{0} found. Must be an InstallISO.'.format(discinfo_file)
+            iso_type_live = False
+        else:
+            if verbose:
+                print '{0} _NOT_ found. Must be a LiveISO.'.format(discinfo_file)
+            iso_type_live = True
+
+        if iso_type_live:
 	    # Okay, this is a Live ISO.
 	    if verbose:
 		print '{0} is a Live ISO. Copying files to {1}.'.format(iso, os.path.join(imagedir, iso_basename))
