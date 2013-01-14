@@ -1,5 +1,5 @@
             *** Multiboot Media Creator ***
-*** Copyright 2011 Tom Callaway <spot@fedoraproject.org> ***
+*** Copyright 2011, 2012 Tom Callaway <spot@fedoraproject.org> ***
 
 == What is it? ==
 * It is a tool that generates a Multiboot ISO image from a set of ISO images,
@@ -13,6 +13,7 @@ appropriate item.
 * It supports both Live and Non-Live (Installation ISO) Images.
 * It was generated for Fedora, and has hardcoded filename assumptions. 
 (Non Fedora Non-Live support will need some code changes.)
+* It has some support for EFI boot
 
 == How do I use it ? ==
 Here is a sample invocation:
