@@ -716,6 +716,15 @@ def makeisolinuximage(isolist, imagedir, mountdir, timeout, bootdefaultiso, targ
     if verbose:
         print 'Copying /usr/share/syslinux/vesamenu.c32 to {0}'.format(isolinuxdir)
     shutil.copy2('/usr/share/syslinux/vesamenu.c32', isolinuxdir)
+    if verbose:
+        print 'Copying /usr/share/syslinux/ldlinux.c32 to {0}'.format(isolinuxdir)
+    shutil.copy2('/usr/share/syslinux/ldlinux.c32', isolinuxdir)
+    if verbose:
+        print 'Copying /usr/share/syslinux/libcom32.c32 to {0}'.format(isolinuxdir)
+    shutil.copy2('/usr/share/syslinux/libcom32.c32', isolinuxdir)
+    if verbose:
+        print 'Copying /usr/share/syslinux/libutil.c32 to {0}'.format(isolinuxdir)
+    shutil.copy2('/usr/share/syslinux/libutil.c32', isolinuxdir)
     # We only need to copy the ifcpu64.c32 file if we have multiarchentries in the isolinux.cfg
     if multiarchentries:
         if verbose:
