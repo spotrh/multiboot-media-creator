@@ -212,16 +212,6 @@ def makeisolinuximage(isolist, imagedir, mountdir, timeout, bootdefaultiso, targ
         iso_basename = os.path.splitext(basename)[0]
         pretty_iso_basename = re.sub(r'-', ' ', iso_basename)
 
-        # isolinux can't read directories or files longer than 31 characters.
-        # Truncate if we need to. (Yes, this could cause issues. :P)
-        if len(iso_basename) > 31:
-            small_iso_basename = iso_basename[:31]
-            if verbose:
-                 print '{0} is {1}, this is longer than the isolinux 31 character max.'.format(iso_basename, len(iso_basename))
-                 print 'In the isolinux.cfg, we will refer to it as {0}.'.format(small_iso_basename)
-        else:
-            small_iso_basename = iso_basename
-
         # Are we in multiarch mode?
         if multiarch:
             if verbose:
@@ -328,9 +318,9 @@ def makeisolinuximage(isolist, imagedir, mountdir, timeout, bootdefaultiso, targ
                 if pairfound:
                     f32.write('label {0}\n'.format(iso_basename))
                     f32.write('  menu label Boot {0}\n'.format(pretty_iso_basename))
-                    # Note that we only need the small_iso_basename for pathing that isolinux will use (kernel and initrd path). All other pathing should use iso_basename.
-                    f32.write('  kernel /{0}/isolinux/vmlinuz0\n'.format(small_iso_basename))
-                    f32.write('  append initrd=/{0}/isolinux/initrd0.img root=live:CDLABEL={1} live_dir=/{2}/LiveOS/ rootfstype=auto ro rd.live.image quiet rhgb rd.luks=0 rd.md=0 rd.dm=0\n'.format(small_iso_basename, targetname, iso_basename))
+                    # Note that we only need the iso_basename for pathing that isolinux will use (kernel and initrd path). All other pathing should use iso_basename.
+                    f32.write('  kernel /{0}/isolinux/vmlinuz0\n'.format(iso_basename))
+                    f32.write('  append initrd=/{0}/isolinux/initrd0.img root=live:CDLABEL={1} live_dir=/{2}/LiveOS/ rootfstype=auto ro rd.live.image quiet rhgb rd.luks=0 rd.md=0 rd.dm=0\n'.format(iso_basename, targetname, iso_basename))
                     f32.write('\n')
 
                     if verbose:
@@ -369,28 +359,19 @@ def makeisolinuximage(isolist, imagedir, mountdir, timeout, bootdefaultiso, targ
                             shutil.copy2(os.path.join(mountdir, 'isolinux/macboot.img'), os.path.join(imagedir, 'isolinux/macboot.img'))
 
                     pretty_x86_64_iso_basename = re.sub(r'-', ' ', x86_64_iso_basename)
-                    # isolinux can't read directories or files longer than 31 characters.
-                    # Truncate if we need to. (Yes, this could cause issues. :P)
-                    if len(x86_64_iso_basename) > 31:
-                        small_x86_64_iso_basename = x86_64_iso_basename[:31]
-                        if verbose:
-                            print '{0} is {1}, this is longer than the isolinux 31 character max.'.format(x86_64_iso_basename, len(x86_64_iso_basename))
-                            print 'In the isolinux.cfg, we will refer to it as {0}.'.format(small_x86_64_iso_basename)
-                    else:
-                        small_x86_64_iso_basename = x86_64_iso_basename
 
                     f64.write('label {0}\n'.format(x86_64_iso_basename))
                     f64.write('  menu label Boot {0}\n'.format(pretty_x86_64_iso_basename))
-                    # Note that we only need the small_x86_64_iso_basename for pathing that isolinux will use (kernel and initrd path). All other pathing should use x86_64_iso_basename.
-                    f64.write('  kernel /{0}/isolinux/vmlinuz0\n'.format(small_x86_64_iso_basename))
-                    f64.write('  append initrd=/{0}/isolinux/initrd0.img root=live:CDLABEL={1} live_dir=/{2}/LiveOS/ rootfstype=auto ro rd.live.image quiet rhgb rd.luks=0 rd.md=0 rd.dm=0\n'.format(small_x86_64_iso_basename, targetname, x86_64_iso_basename))
+                    # Note that we only need the x86_64_iso_basename for pathing that isolinux will use (kernel and initrd path). All other pathing should use x86_64_iso_basename.
+                    f64.write('  kernel /{0}/isolinux/vmlinuz0\n'.format(x86_64_iso_basename))
+                    f64.write('  append initrd=/{0}/isolinux/initrd0.img root=live:CDLABEL={1} live_dir=/{2}/LiveOS/ rootfstype=auto ro rd.live.image quiet rhgb rd.luks=0 rd.md=0 rd.dm=0\n'.format(x86_64_iso_basename, targetname, x86_64_iso_basename))
                     f64.write('\n')
 
                     # Only write out x86_64 targets to the GRUB2 EFI config (no support for 32bit EFI)
                     if efi:
                         masterueficonf.write('menuentry \'{0}\' --class fedora --class gnu-linux --class gnu --class os {{\n'.format(pretty_x86_64_iso_basename))
-                        masterueficonf.write('\tlinuxefi /{0}/isolinux/vmlinuz0 root=live:LABEL={1} rootfstype=auto ro rd.live.image quiet rhgb rd.luks=0 rd.md=0 rd.dm=0 live_dir=/{2}/LiveOS/\n'.format(small_x86_64_iso_basename, targetname, x86_64_iso_basename))
-                        masterueficonf.write('\tinitrdefi /{0}/isolinux/initrd0.img\n'.format(small_x86_64_iso_basename))
+                        masterueficonf.write('\tlinuxefi /{0}/isolinux/vmlinuz0 root=live:LABEL={1} rootfstype=auto ro rd.live.image quiet rhgb rd.luks=0 rd.md=0 rd.dm=0 live_dir=/{2}/LiveOS/\n'.format(x86_64_iso_basename, targetname, x86_64_iso_basename))
+                        masterueficonf.write('\tinitrdefi /{0}/isolinux/initrd0.img\n'.format(x86_64_iso_basename))
                         masterueficonf.write('}\n')
 
                     # Now, pull x86_64_iso out of 'isolist'
@@ -406,15 +387,15 @@ def makeisolinuximage(isolist, imagedir, mountdir, timeout, bootdefaultiso, targ
                     fnopair.write('  menu label Boot {0}\n'.format(pretty_iso_basename))
                     if bootdefaultiso == iso:
                         fnopair.write('  menu default\n')
-                    # Note that we only need the small_iso_basename for pathing that isolinux will use (kernel and initrd path). All other pathing should use iso_basename.
-                    fnopair.write('  kernel /{0}/isolinux/vmlinuz0\n'.format(small_iso_basename))
-                    fnopair.write('  append initrd=/{0}/isolinux/initrd0.img root=live:CDLABEL={1} live_dir=/{2}/LiveOS/ rootfstype=auto ro rd.live.image quiet rhgb rd.luks=0 rd.md=0 rd.dm=0\n'.format(small_iso_basename, targetname, iso_basename))
+                    # Note that we only need the iso_basename for pathing that isolinux will use (kernel and initrd path). All other pathing should use iso_basename.
+                    fnopair.write('  kernel /{0}/isolinux/vmlinuz0\n'.format(iso_basename))
+                    fnopair.write('  append initrd=/{0}/isolinux/initrd0.img root=live:CDLABEL={1} live_dir=/{2}/LiveOS/ rootfstype=auto ro rd.live.image quiet rhgb rd.luks=0 rd.md=0 rd.dm=0\n'.format(iso_basename, targetname, iso_basename))
                     fnopair.write('\n')
 
                     if efi:
                         masterueficonf.write('menuentry \'{0}\' --class fedora --class gnu-linux --class gnu --class os {{\n'.format(pretty_iso_basename))
-                        masterueficonf.write('\tlinuxefi /{0}/isolinux/vmlinuz0 root=live:LABEL={1} rootfstype=auto ro rd.live.image quiet rhgb rd.luks=0 rd.md=0 rd.dm=0 live_dir=/{2}/LiveOS/\n'.format(small_iso_basename, targetname, iso_basename))
-                        masterueficonf.write('\tinitrdefi /{0}/isolinux/initrd0.img\n'.format(small_iso_basename))
+                        masterueficonf.write('\tlinuxefi /{0}/isolinux/vmlinuz0 root=live:LABEL={1} rootfstype=auto ro rd.live.image quiet rhgb rd.luks=0 rd.md=0 rd.dm=0 live_dir=/{2}/LiveOS/\n'.format(iso_basename, targetname, iso_basename))
+                        masterueficonf.write('\tinitrdefi /{0}/isolinux/initrd0.img\n'.format(iso_basename))
                         masterueficonf.write('}\n')
 
             # Multiarch disabled
@@ -423,15 +404,15 @@ def makeisolinuximage(isolist, imagedir, mountdir, timeout, bootdefaultiso, targ
                 f.write('  menu label Boot {0}\n'.format(pretty_iso_basename))
                 if bootdefaultiso == iso:
                     f.write('  menu default\n')
-                # Note that we only need the small_iso_basename for pathing that isolinux will use (kernel and initrd path). All other pathing should use iso_basename.
-                f.write('  kernel /{0}/isolinux/vmlinuz0\n'.format(small_iso_basename))
-                f.write('  append initrd=/{0}/isolinux/initrd0.img root=live:CDLABEL={1} live_dir=/{2}/LiveOS/ rootfstype=auto ro rd.live.image quiet rhgb rd.luks=0 rd.md=0 rd.dm=0\n'.format(small_iso_basename, targetname, iso_basename))
+                # Note that we only need the iso_basename for pathing that isolinux will use (kernel and initrd path). All other pathing should use iso_basename.
+                f.write('  kernel /{0}/isolinux/vmlinuz0\n'.format(iso_basename))
+                f.write('  append initrd=/{0}/isolinux/initrd0.img root=live:CDLABEL={1} live_dir=/{2}/LiveOS/ rootfstype=auto ro rd.live.image quiet rhgb rd.luks=0 rd.md=0 rd.dm=0\n'.format(iso_basename, targetname, iso_basename))
                 f.write('\n')
 
                 if efi:
                     masterueficonf.write('menuentry \'{0}\' --class fedora --class gnu-linux --class gnu --class os {{\n'.format(pretty_iso_basename))
-                    masterueficonf.write('\tlinuxefi /{0}/isolinux/vmlinuz0 root=live:LABEL={1} rootfstype=auto ro rd.live.image quiet rhgb rd.luks=0 rd.md=0 rd.dm=0 live_dir=/{2}/LiveOS/\n'.format(small_iso_basename, targetname, iso_basename))
-                    masterueficonf.write('\tinitrdefi /{0}/isolinux/initrd0.img\n'.format(small_iso_basename))
+                    masterueficonf.write('\tlinuxefi /{0}/isolinux/vmlinuz0 root=live:LABEL={1} rootfstype=auto ro rd.live.image quiet rhgb rd.luks=0 rd.md=0 rd.dm=0 live_dir=/{2}/LiveOS/\n'.format(iso_basename, targetname, iso_basename))
+                    masterueficonf.write('\tinitrdefi /{0}/isolinux/initrd0.img\n'.format(iso_basename))
                     masterueficonf.write('}\n')
 
             # Now, we write out the basic video entry
@@ -439,9 +420,9 @@ def makeisolinuximage(isolist, imagedir, mountdir, timeout, bootdefaultiso, targ
             bvt.write('  menu label {0} (Basic Video)\n'.format(pretty_iso_basename))
             if bootdefaultiso == iso:
                 bvt.write('  menu default\n')
-            # Note that we only need the small_iso_basename for pathing that isolinux will use (kernel and initrd path). All other pathing should use iso_basename.
-            bvt.write('  kernel /{0}/isolinux/vmlinuz0\n'.format(small_iso_basename))
-            bvt.write('  append initrd=/{0}/isolinux/initrd0.img root=live:CDLABEL={1} live_dir=/{2}/LiveOS/ rootfstype=auto ro rd.live.image quiet rhgb rd.luks=0 rd.md=0 rd.dm=0 xdriver=vesa nomodeset\n'.format(small_iso_basename, targetname, iso_basename))            
+            # Note that we only need the iso_basename for pathing that isolinux will use (kernel and initrd path). All other pathing should use iso_basename.
+            bvt.write('  kernel /{0}/isolinux/vmlinuz0\n'.format(iso_basename))
+            bvt.write('  append initrd=/{0}/isolinux/initrd0.img root=live:CDLABEL={1} live_dir=/{2}/LiveOS/ rootfstype=auto ro rd.live.image quiet rhgb rd.luks=0 rd.md=0 rd.dm=0 xdriver=vesa nomodeset\n'.format(iso_basename, targetname, iso_basename))            
             bvt.write('\n')
 
             if pairfound:
@@ -450,9 +431,9 @@ def makeisolinuximage(isolist, imagedir, mountdir, timeout, bootdefaultiso, targ
                 bvt.write('  menu label {0} (Basic Video)\n'.format(pretty_x86_64_iso_basename))
                 if bootdefaultiso == x86_64_iso:
                     bvt.write('  menu default\n')
-                # Note that we only need the small_iso_basename for pathing that isolinux will use (kernel and initrd path). All other pathing should use iso_basename.
-                bvt.write('  kernel /{0}/isolinux/vmlinuz0\n'.format(small_x86_64_iso_basename))
-                bvt.write('  append initrd=/{0}/isolinux/initrd0.img root=live:CDLABEL={1} live_dir=/{2}/LiveOS/ rootfstype=auto ro rd.live.image quiet rhgb rd.luks=0 rd.md=0 rd.dm=0 xdriver=vesa nomodeset\n'.format(small_x86_64_iso_basename, targetname, x86_64_iso_basename))
+                # Note that we only need the iso_basename for pathing that isolinux will use (kernel and initrd path). All other pathing should use iso_basename.
+                bvt.write('  kernel /{0}/isolinux/vmlinuz0\n'.format(x86_64_iso_basename))
+                bvt.write('  append initrd=/{0}/isolinux/initrd0.img root=live:CDLABEL={1} live_dir=/{2}/LiveOS/ rootfstype=auto ro rd.live.image quiet rhgb rd.luks=0 rd.md=0 rd.dm=0 xdriver=vesa nomodeset\n'.format(x86_64_iso_basename, targetname, x86_64_iso_basename))
                 bvt.write('\n')
 
             makehelperdirs(imagedir, iso_basename, "isolinux", verbose)
@@ -489,9 +470,9 @@ def makeisolinuximage(isolist, imagedir, mountdir, timeout, bootdefaultiso, targ
                 if pairfound:
                     f32.write('label {0}\n'.format(iso_basename))
                     f32.write('  menu label Install {0}\n'.format(pretty_iso_basename))
-                    # Note that we only need the small_iso_basename for pathing that isolinux will use (kernel and initrd path). All other pathing should use iso_basename.
-                    f32.write('  kernel /{0}/isolinux/vmlinuz\n'.format(small_iso_basename))
-                    f32.write('  append initrd=/{0}/isolinux/initrd.img repo=hd:LABEL={1}:/{2}/\n'.format(small_iso_basename, targetname, iso_basename))
+                    # Note that we only need the iso_basename for pathing that isolinux will use (kernel and initrd path). All other pathing should use iso_basename.
+                    f32.write('  kernel /{0}/isolinux/vmlinuz\n'.format(iso_basename))
+                    f32.write('  append initrd=/{0}/isolinux/initrd.img repo=hd:LABEL={1}:/{2}/\n'.format(iso_basename, targetname, iso_basename))
                     f32.write('\n')
 
                     if verbose:
@@ -517,18 +498,18 @@ def makeisolinuximage(isolist, imagedir, mountdir, timeout, bootdefaultiso, targ
                     # isolinux can't read directories or files longer than 31 characters.
                     # Truncate if we need to. (Yes, this could cause issues. :P)
                     if len(x86_64_iso_basename) > 31:
-                        small_x86_64_iso_basename = x86_64_iso_basename[:31]
+                        x86_64_iso_basename = x86_64_iso_basename[:31]
                         if verbose:
                             print '{0} is {1}, this is longer than the isolinux 31 character max.'.format(x86_64_iso_basename, len(x86_64_iso_basename))
-                            print 'In the isolinux.cfg, we will refer to it as {0}.'.format(small_x86_64_iso_basename)
+                            print 'In the isolinux.cfg, we will refer to it as {0}.'.format(x86_64_iso_basename)
                     else:
-                        small_x86_64_iso_basename = x86_64_iso_basename
+                        x86_64_iso_basename = x86_64_iso_basename
 
                     f64.write('label {0}\n'.format(x86_64_iso_basename))
                     f64.write('  menu label Install {0}\n'.format(pretty_x86_64_iso_basename))
-                    # Note that we only need the small_x86_64_iso_basename for pathing that isolinux will use (kernel and initrd path). All other pathing should use x86_64_iso_basename.
-                    f64.write('  kernel /{0}/isolinux/vmlinuz\n'.format(small_x86_64_iso_basename))
-                    f64.write('  append initrd=/{0}/isolinux/initrd.img repo=hd:LABEL={1}:/{2}/\n'.format(small_x86_64_iso_basename, targetname, x86_64_iso_basename))
+                    # Note that we only need the x86_64_iso_basename for pathing that isolinux will use (kernel and initrd path). All other pathing should use x86_64_iso_basename.
+                    f64.write('  kernel /{0}/isolinux/vmlinuz\n'.format(x86_64_iso_basename))
+                    f64.write('  append initrd=/{0}/isolinux/initrd.img repo=hd:LABEL={1}:/{2}/\n'.format(x86_64_iso_basename, targetname, x86_64_iso_basename))
                     f64.write('\n')
                     # Now, pull x86_64_iso out of 'isolist'
                     try:
@@ -543,9 +524,9 @@ def makeisolinuximage(isolist, imagedir, mountdir, timeout, bootdefaultiso, targ
                     fnopair.write('  menu label Install {0}\n'.format(pretty_iso_basename))
                     if bootdefaultiso == iso:
                         fnopair.write('  menu default\n')
-                    # Note that we only need the small_iso_basename for pathing that isolinux will use (kernel and initrd path). All other pathing should use iso_basename.
-                    fnopair.write('  kernel /{0}/isolinux/vmlinuz\n'.format(small_iso_basename))
-                    fnopair.write('  append initrd=/{0}/isolinux/initrd.img repo=hd:LABEL={1}:/{2}/\n'.format(small_iso_basename, targetname, iso_basename))
+                    # Note that we only need the iso_basename for pathing that isolinux will use (kernel and initrd path). All other pathing should use iso_basename.
+                    fnopair.write('  kernel /{0}/isolinux/vmlinuz\n'.format(iso_basename))
+                    fnopair.write('  append initrd=/{0}/isolinux/initrd.img repo=hd:LABEL={1}:/{2}/\n'.format(iso_basename, targetname, iso_basename))
                     fnopair.write('\n')
 
             # Multiarch disabled
@@ -554,9 +535,9 @@ def makeisolinuximage(isolist, imagedir, mountdir, timeout, bootdefaultiso, targ
                 f.write('  menu label Install {0}\n'.format(pretty_iso_basename))
                 if bootdefaultiso == iso:
                     f.write('  menu default\n')
-                f.write('  kernel /{0}/isolinux/vmlinuz\n'.format(small_iso_basename))
-                # Note that we only need the small_iso_basename for pathing that isolinux will use (kernel and initrd path). All other pathing should use iso_basename.
-                f.write('  append initrd=/{0}/isolinux/initrd.img repo=hd:LABEL={1}:/{2}/\n'.format(small_iso_basename, targetname, iso_basename))
+                f.write('  kernel /{0}/isolinux/vmlinuz\n'.format(iso_basename))
+                # Note that we only need the iso_basename for pathing that isolinux will use (kernel and initrd path). All other pathing should use iso_basename.
+                f.write('  append initrd=/{0}/isolinux/initrd.img repo=hd:LABEL={1}:/{2}/\n'.format(iso_basename, targetname, iso_basename))
                 f.write('\n')
 
             # Now, we write out the basic video entry
@@ -564,9 +545,9 @@ def makeisolinuximage(isolist, imagedir, mountdir, timeout, bootdefaultiso, targ
             bvt.write('  menu label {0} (Basic Video)\n'.format(pretty_iso_basename))
             if bootdefaultiso == iso:
                 bvt.write('  menu default\n')
-            # Note that we only need the small_iso_basename for pathing that isolinux will use (kernel and initrd path). All other pathing should use iso_basename.
-            bvt.write('  kernel /{0}/isolinux/vmlinuz\n'.format(small_iso_basename))
-            bvt.write('  append initrd=/{0}/isolinux/initrd.img repo=hd:LABEL={1}:/{2} xdriver=vesa nomodeset\n'.format(small_iso_basename, targetname, iso_basename))
+            # Note that we only need the iso_basename for pathing that isolinux will use (kernel and initrd path). All other pathing should use iso_basename.
+            bvt.write('  kernel /{0}/isolinux/vmlinuz\n'.format(iso_basename))
+            bvt.write('  append initrd=/{0}/isolinux/initrd.img repo=hd:LABEL={1}:/{2} xdriver=vesa nomodeset\n'.format(iso_basename, targetname, iso_basename))
             bvt.write('\n')
 
             if pairfound:
@@ -575,9 +556,9 @@ def makeisolinuximage(isolist, imagedir, mountdir, timeout, bootdefaultiso, targ
                 bvt.write('  menu label {0} (Basic Video)\n'.format(pretty_x86_64_iso_basename))
                 if bootdefaultiso == x86_64_iso:
                     bvt.write('  menu default\n')
-                # Note that we only need the small_x86_64_iso_basename for pathing that isolinux will use (kernel and initrd path). All other pathing should use x86_64_iso_basename.
-                bvt.write('  kernel /{0}/isolinux/vmlinuz\n'.format(small_x86_64_iso_basename))
-                bvt.write('  append initrd=/{0}/isolinux/initrd.img repo=hd:LABEL={1}:/{2} xdriver=vesa nomodeset\n'.format(small_x86_64_iso_basename, targetname, x86_64_iso_basename))
+                # Note that we only need the x86_64_iso_basename for pathing that isolinux will use (kernel and initrd path). All other pathing should use x86_64_iso_basename.
+                bvt.write('  kernel /{0}/isolinux/vmlinuz\n'.format(x86_64_iso_basename))
+                bvt.write('  append initrd=/{0}/isolinux/initrd.img repo=hd:LABEL={1}:/{2} xdriver=vesa nomodeset\n'.format(x86_64_iso_basename, targetname, x86_64_iso_basename))
                 bvt.write('\n')
 
             if verbose:
