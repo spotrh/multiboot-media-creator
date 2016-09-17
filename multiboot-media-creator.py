@@ -27,7 +27,7 @@ import sys
 import time
 
 name = 'Multiboot Media Creator'
-version = 0.7.1
+version = 0.8
 my_description = '{0} {1}'.format(name, version)
 
 def makeuefidirs(imagedir, verbose):
