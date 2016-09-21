@@ -12,9 +12,9 @@
 # the full text of the license.
 #
 # Inspiration and implementation ideas borrowed from fedpkg by Jesse Keating
-# which is also available under the terms of the GNU General Public License as 
-# published by the Free Software Foundation; either version 2 of the License, 
-# or (at your option) any later version.  
+# which is also available under the terms of the GNU General Public License as
+# published by the Free Software Foundation; either version 2 of the License,
+# or (at your option) any later version.
 
 import argparse
 import glob
@@ -27,11 +27,11 @@ import sys
 import time
 
 name = 'Multiboot Media Creator'
-version = 0.7
+version = 0.8
 my_description = '{0} {1}'.format(name, version)
 
 def makeuefidirs(imagedir, verbose):
-    uefi_dirs = ['EFI/BOOT', 'EFI/BOOT/fonts']
+    uefi_dirs = ['EFI/BOOT', 'EFI/BOOT/fonts', 'images']
     for dir in uefi_dirs:
         if os.path.isdir(os.path.join(imagedir, dir)):
             # The directory exists, do nothing.
@@ -50,13 +50,13 @@ def makehelperdirs(imagedir, iso_basename, type, verbose):
     if type == "grub":
         dirs = ['boot', 'images', 'CHECKSUM']
     else:
-        dirs = ['isolinux', 'images', 'CHECKSUM']
+        dirs = ['isolinux', 'images']
     for dir in dirs:
         if os.path.isdir(os.path.join(imagedir, iso_basename, dir)):
             # The directory exists, do nothing.
             if verbose:
                 print '{0} exists, skipping directory creation.'.format(os.path.join(imagedir, iso_basename, dir))
-        else: 
+        else:
             if verbose:
                 print 'Creating directory: {0}'.format(os.path.join(imagedir, iso_basename, dir))
             try:
@@ -65,14 +65,14 @@ def makehelperdirs(imagedir, iso_basename, type, verbose):
                 error = sys.exc_info()[1]
                 sys.exit('I was trying to make an image directory as {0}, but I failed with error {1}. Exiting.'.format(os.makedirs(os.path.join(imagedir, iso_basename, dir)), error))
 
-def makeisolinuximage(isolist, imagedir, mountdir, timeout, bootdefaultiso, targetiso, targetname, isolinuxsplash, isodir, nomultiarch, efi, bootdefaultnum, verbose):
+def makeisolinuximage(isolist, imagedir, mountdir, timeout, bootdefaultiso, targetiso, targetname, isolinuxsplash, isodir, nomultiarch, efi, bootdefaultnum, verbose, volumeheaderinfo):
     # Second Sanity Check
     # Memtest86+ test
     memtest_list = glob.glob('/boot/memtest86+-*')
     if memtest_list:
         memtest_binary = memtest_list[0]
     else:
-        sys.exit('Could not find memtest86+ binary in /boot ? Perhaps memtest86+ is not installed?')           
+        sys.exit('Could not find memtest86+ binary in /boot ? Perhaps memtest86+ is not installed?')
 
     if efi:
        uefidir = os.path.join(imagedir, 'EFI/BOOT')
@@ -92,7 +92,7 @@ def makeisolinuximage(isolist, imagedir, mountdir, timeout, bootdefaultiso, targ
 
        # Write our header into the master GRUB2 config file
        # There is almost certainly a more appropriate way to do this.
-       masterueficonf.write('\n')
+       #masterueficonf.write('\n')
        masterueficonf.write('set default="{0}"\n'.format(bootdefaultnum))
        masterueficonf.write('\n')
        masterueficonf.write('function load_video {\n')
@@ -109,8 +109,10 @@ def makeisolinuximage(isolist, imagedir, mountdir, timeout, bootdefaultiso, targ
        masterueficonf.write('insmod part_gpt\n')
        masterueficonf.write('insmod ext2\n')
        masterueficonf.write('\n')
-       masterueficonf.write('set timeout=10\n')
+       masterueficonf.write('set timeout={0}\n'.format(timeout))
        masterueficonf.write('### END /etc/grub.d/00_header ###\n')
+       masterueficonf.write('\n')
+       masterueficonf.write('search --no-floppy --set=root -l \'{0}\'\n'.format(targetname))
        masterueficonf.write('\n')
        masterueficonf.write('## BEGIN /etc/grub.d/10_linux ###\n')
 
@@ -152,7 +154,7 @@ def makeisolinuximage(isolist, imagedir, mountdir, timeout, bootdefaultiso, targ
     # TODO: This is based on the Fedora 14 header, probably needs to be cleaned up.
 
     masterconf.write('default vesamenu.c32\n')
-    masterconf.write('timeout {0}\n'.format(timeout))
+    masterconf.write('timeout {0}\n'.format(timeout*10))
     masterconf.write('\n')
     # masterconf.write('display boot.msg\n')
     # masterconf.write('\n')
@@ -169,7 +171,7 @@ def makeisolinuximage(isolist, imagedir, mountdir, timeout, bootdefaultiso, targ
     masterconf.write('menu color scrollbar 0 #ffffffff #00000000\n')
     masterconf.write('\n')
 
-    # If multiarch mode is enabled, we need two (maybe three) files. 
+    # If multiarch mode is enabled, we need two (maybe three) files.
     if multiarch:
        # This file is where we store the normal 32bit target entries
        f32file = os.path.join(imagedir, 'normal32targets.part')
@@ -239,7 +241,7 @@ def makeisolinuximage(isolist, imagedir, mountdir, timeout, bootdefaultiso, targ
                 if verbose:
                    print '{0} did not match  i[3456]+86'.format(iso)
                 # If it isn't i[3456]+86, then it has no pair.
-                pairfound = False 
+                pairfound = False
 	else:
             if verbose:
                 print 'Multiarch mode disabled.'
@@ -275,22 +277,22 @@ def makeisolinuximage(isolist, imagedir, mountdir, timeout, bootdefaultiso, targ
             # HACK HACK HACK
             # We're copying the first efiboot.img and macboot.img we find.
             if efi:
-               if os.path.isfile(os.path.join(imagedir, 'isolinux/efiboot.img')):
+               if os.path.isfile(os.path.join(imagedir, 'images/efiboot.img')):
                    if verbose:
-                       print '{0} already present, nothing to do here.'.format(os.path.join(imagedir, 'isolinux/efiboot.img'))
+                       print '{0} already present, nothing to do here.'.format(os.path.join(imagedir, 'images/efiboot.img'))
                else:
-                   if os.path.isfile(os.path.join(mountdir, 'isolinux/efiboot.img')):
+                   if os.path.isfile(os.path.join(mountdir, 'images/efiboot.img')):
                        if verbose:
-                           print 'Copying {0} to {1}.'.format(os.path.join(mountdir, 'isolinux/efiboot.img'), os.path.join(imagedir, 'isolinux/efiboot.img'))
-                       shutil.copy2(os.path.join(mountdir, 'isolinux/efiboot.img'), os.path.join(imagedir, 'isolinux/efiboot.img'))    
-               if os.path.isfile(os.path.join(imagedir, 'isolinux/macboot.img')):
+                           print 'Copying {0} to {1}.'.format(os.path.join(mountdir, 'images/efiboot.img'), os.path.join(imagedir, 'images/efiboot.img'))
+                       shutil.copy2(os.path.join(mountdir, 'images/efiboot.img'), os.path.join(imagedir, 'images/efiboot.img'))
+               if os.path.isfile(os.path.join(imagedir, 'images/macboot.img')):
                    if verbose:
-                       print '{0} already present, nothing to do here.'.format(os.path.join(imagedir, 'isolinux/macboot.img'))
+                       print '{0} already present, nothing to do here.'.format(os.path.join(imagedir, 'images/macboot.img'))
                else:
-                   if os.path.isfile(os.path.join(mountdir, 'isolinux/macboot.img')):
+                   if os.path.isfile(os.path.join(mountdir, 'images/macboot.img')):
                        if verbose:
-                           print 'Copying {0} to {1}.'.format(os.path.join(mountdir, 'isolinux/macboot.img'), os.path.join(imagedir, 'isolinux/macboot.img'))
-               	       shutil.copy2(os.path.join(mountdir, 'isolinux/macboot.img'), os.path.join(imagedir, 'isolinux/macboot.img'))
+                           print 'Copying {0} to {1}.'.format(os.path.join(mountdir, 'images/macboot.img'), os.path.join(imagedir, 'images/macboot.img'))
+               	       shutil.copy2(os.path.join(mountdir, 'images/macboot.img'), os.path.join(imagedir, 'images/macboot.img'))
 
             if pairfound:
                 x86_64_basename = os.path.basename(x86_64_iso)
@@ -319,8 +321,8 @@ def makeisolinuximage(isolist, imagedir, mountdir, timeout, bootdefaultiso, targ
                     f32.write('label {0}\n'.format(iso_basename))
                     f32.write('  menu label Boot {0}\n'.format(pretty_iso_basename))
                     # Note that we only need the iso_basename for pathing that isolinux will use (kernel and initrd path). All other pathing should use iso_basename.
-                    f32.write('  kernel /{0}/isolinux/vmlinuz0\n'.format(iso_basename))
-                    f32.write('  append initrd=/{0}/isolinux/initrd0.img root=live:CDLABEL={1} live_dir=/{2}/LiveOS/ rootfstype=auto ro rd.live.image quiet rhgb rd.luks=0 rd.md=0 rd.dm=0\n'.format(iso_basename, targetname, iso_basename))
+                    f32.write('  kernel /{0}/isolinux/vmlinuz\n'.format(iso_basename))
+                    f32.write('  append initrd=/{0}/isolinux/initrd.img root=live:CDLABEL={1} rd.live.dir=/{2}/LiveOS/ rootfstype=auto ro rd.live.image quiet rhgb rd.luks=0 rd.md=0 rd.dm=0\n'.format(iso_basename, targetname, iso_basename))
                     f32.write('\n')
 
                     if verbose:
@@ -336,42 +338,42 @@ def makeisolinuximage(isolist, imagedir, mountdir, timeout, bootdefaultiso, targ
                     result = os.system(mount_command)
                     if result:
                         sys.exit('I tried to run {0}, but it failed. Exiting.'.format(mount_command))
-                    shutil.copytree(mountdir, os.path.join(imagedir, x86_64_iso_basename))  
+                    shutil.copytree(mountdir, os.path.join(imagedir, x86_64_iso_basename))
 
                     # HACK HACK HACK
                     # We're copying the first efiboot.img and macboot.img we find.
                     if efi:
-                        if os.path.isfile(os.path.join(imagedir, 'isolinux/efiboot.img')):
+                        if os.path.isfile(os.path.join(imagedir, 'images/efiboot.img')):
                             if verbose:
-                                print '{0} already present, nothing to do here.'.format(os.path.join(imagedir, 'isolinux/efiboot.img'))
+                                print '{0} already present, nothing to do here.'.format(os.path.join(imagedir, 'images/efiboot.img'))
                         else:
-                            if os.path.isfile(os.path.join(mountdir, 'isolinux/efiboot.img')):
+                            if os.path.isfile(os.path.join(mountdir, 'images/efiboot.img')):
                                 if verbose:
-                                    print 'Copying {0} to {1}.'.format(os.path.join(mountdir, 'isolinux/efiboot.img'), os.path.join(imagedir, 'isolinux/efiboot.img'))
-                            shutil.copy2(os.path.join(mountdir, 'isolinux/efiboot.img'), os.path.join(imagedir, 'isolinux/efiboot.img'))
-                        if os.path.isfile(os.path.join(imagedir, 'isolinux/macboot.img')):
+                                    print 'Copying {0} to {1}.'.format(os.path.join(mountdir, 'images/efiboot.img'), os.path.join(imagedir, 'images/efiboot.img'))
+                            shutil.copy2(os.path.join(mountdir, 'images/efiboot.img'), os.path.join(imagedir, 'images/efiboot.img'))
+                        if os.path.isfile(os.path.join(imagedir, 'images/macboot.img')):
                             if verbose:
-                                print '{0} already present, nothing to do here.'.format(os.path.join(imagedir, 'isolinux/macboot.img'))
+                                print '{0} already present, nothing to do here.'.format(os.path.join(imagedir, 'images/macboot.img'))
                         else:
-                            if os.path.isfile(os.path.join(mountdir, 'isolinux/macboot.img')):
+                            if os.path.isfile(os.path.join(mountdir, 'images/macboot.img')):
                                 if verbose:
-                                    print 'Copying {0} to {1}.'.format(os.path.join(mountdir, 'isolinux/macboot.img'), os.path.join(imagedir, 'isolinux/macboot.img'))
-                            shutil.copy2(os.path.join(mountdir, 'isolinux/macboot.img'), os.path.join(imagedir, 'isolinux/macboot.img'))
+                                    print 'Copying {0} to {1}.'.format(os.path.join(mountdir, 'images/macboot.img'), os.path.join(imagedir, 'images/macboot.img'))
+                            shutil.copy2(os.path.join(mountdir, 'images/macboot.img'), os.path.join(imagedir, 'images/macboot.img'))
 
                     pretty_x86_64_iso_basename = re.sub(r'-', ' ', x86_64_iso_basename)
 
                     f64.write('label {0}\n'.format(x86_64_iso_basename))
                     f64.write('  menu label Boot {0}\n'.format(pretty_x86_64_iso_basename))
                     # Note that we only need the x86_64_iso_basename for pathing that isolinux will use (kernel and initrd path). All other pathing should use x86_64_iso_basename.
-                    f64.write('  kernel /{0}/isolinux/vmlinuz0\n'.format(x86_64_iso_basename))
-                    f64.write('  append initrd=/{0}/isolinux/initrd0.img root=live:CDLABEL={1} live_dir=/{2}/LiveOS/ rootfstype=auto ro rd.live.image quiet rhgb rd.luks=0 rd.md=0 rd.dm=0\n'.format(x86_64_iso_basename, targetname, x86_64_iso_basename))
+                    f64.write('  kernel /{0}/isolinux/vmlinuz\n'.format(x86_64_iso_basename))
+                    f64.write('  append initrd=/{0}/isolinux/initrd.img root=live:CDLABEL={1} rd.live.dir=/{2}/LiveOS/ rootfstype=auto ro rd.live.image quiet rhgb rd.luks=0 rd.md=0 rd.dm=0\n'.format(x86_64_iso_basename, targetname, x86_64_iso_basename))
                     f64.write('\n')
 
                     # Only write out x86_64 targets to the GRUB2 EFI config (no support for 32bit EFI)
                     if efi:
                         masterueficonf.write('menuentry \'{0}\' --class fedora --class gnu-linux --class gnu --class os {{\n'.format(pretty_x86_64_iso_basename))
-                        masterueficonf.write('\tlinuxefi /{0}/isolinux/vmlinuz0 root=live:LABEL={1} rootfstype=auto ro rd.live.image quiet rhgb rd.luks=0 rd.md=0 rd.dm=0 live_dir=/{2}/LiveOS/\n'.format(x86_64_iso_basename, targetname, x86_64_iso_basename))
-                        masterueficonf.write('\tinitrdefi /{0}/isolinux/initrd0.img\n'.format(x86_64_iso_basename))
+                        masterueficonf.write('\tlinuxefi /{0}/isolinux/vmlinuz root=live:LABEL={1} rootfstype=auto ro rd.live.image quiet rhgb rd.luks=0 rd.md=0 rd.dm=0 rd.live.dir=/{2}/LiveOS/\n'.format(x86_64_iso_basename, targetname, x86_64_iso_basename))
+                        masterueficonf.write('\tinitrdefi /{0}/isolinux/initrd.img\n'.format(x86_64_iso_basename))
                         masterueficonf.write('}\n')
 
                     # Now, pull x86_64_iso out of 'isolist'
@@ -388,14 +390,14 @@ def makeisolinuximage(isolist, imagedir, mountdir, timeout, bootdefaultiso, targ
                     if bootdefaultiso == iso:
                         fnopair.write('  menu default\n')
                     # Note that we only need the iso_basename for pathing that isolinux will use (kernel and initrd path). All other pathing should use iso_basename.
-                    fnopair.write('  kernel /{0}/isolinux/vmlinuz0\n'.format(iso_basename))
-                    fnopair.write('  append initrd=/{0}/isolinux/initrd0.img root=live:CDLABEL={1} live_dir=/{2}/LiveOS/ rootfstype=auto ro rd.live.image quiet rhgb rd.luks=0 rd.md=0 rd.dm=0\n'.format(iso_basename, targetname, iso_basename))
+                    fnopair.write('  kernel /{0}/isolinux/vmlinuz\n'.format(iso_basename))
+                    fnopair.write('  append initrd=/{0}/isolinux/initrd.img root=live:CDLABEL={1} rd.live.dir=/{2}/LiveOS/ rootfstype=auto ro rd.live.image quiet rhgb rd.luks=0 rd.md=0 rd.dm=0\n'.format(iso_basename, targetname, iso_basename))
                     fnopair.write('\n')
 
                     if efi:
                         masterueficonf.write('menuentry \'{0}\' --class fedora --class gnu-linux --class gnu --class os {{\n'.format(pretty_iso_basename))
-                        masterueficonf.write('\tlinuxefi /{0}/isolinux/vmlinuz0 root=live:LABEL={1} rootfstype=auto ro rd.live.image quiet rhgb rd.luks=0 rd.md=0 rd.dm=0 live_dir=/{2}/LiveOS/\n'.format(iso_basename, targetname, iso_basename))
-                        masterueficonf.write('\tinitrdefi /{0}/isolinux/initrd0.img\n'.format(iso_basename))
+                        masterueficonf.write('\tlinuxefi /{0}/isolinux/vmlinuz root=live:LABEL={1} rootfstype=auto ro rd.live.image quiet rhgb rd.luks=0 rd.md=0 rd.dm=0 rd.live.dir=/{2}/LiveOS/\n'.format(iso_basename, targetname, iso_basename))
+                        masterueficonf.write('\tinitrdefi /{0}/isolinux/initrd.img\n'.format(iso_basename))
                         masterueficonf.write('}\n')
 
             # Multiarch disabled
@@ -405,14 +407,14 @@ def makeisolinuximage(isolist, imagedir, mountdir, timeout, bootdefaultiso, targ
                 if bootdefaultiso == iso:
                     f.write('  menu default\n')
                 # Note that we only need the iso_basename for pathing that isolinux will use (kernel and initrd path). All other pathing should use iso_basename.
-                f.write('  kernel /{0}/isolinux/vmlinuz0\n'.format(iso_basename))
-                f.write('  append initrd=/{0}/isolinux/initrd0.img root=live:CDLABEL={1} live_dir=/{2}/LiveOS/ rootfstype=auto ro rd.live.image quiet rhgb rd.luks=0 rd.md=0 rd.dm=0\n'.format(iso_basename, targetname, iso_basename))
+                f.write('  kernel /{0}/isolinux/vmlinuz\n'.format(iso_basename))
+                f.write('  append initrd=/{0}/isolinux/initrd.img root=live:CDLABEL={1} rd.live.dir=/{2}/LiveOS/ rootfstype=auto ro rd.live.image quiet rhgb rd.luks=0 rd.md=0 rd.dm=0\n'.format(iso_basename, targetname, iso_basename))
                 f.write('\n')
 
                 if efi:
                     masterueficonf.write('menuentry \'{0}\' --class fedora --class gnu-linux --class gnu --class os {{\n'.format(pretty_iso_basename))
-                    masterueficonf.write('\tlinuxefi /{0}/isolinux/vmlinuz0 root=live:LABEL={1} rootfstype=auto ro rd.live.image quiet rhgb rd.luks=0 rd.md=0 rd.dm=0 live_dir=/{2}/LiveOS/\n'.format(iso_basename, targetname, iso_basename))
-                    masterueficonf.write('\tinitrdefi /{0}/isolinux/initrd0.img\n'.format(iso_basename))
+                    masterueficonf.write('\tlinuxefi /{0}/isolinux/vmlinuz root=live:LABEL={1} rootfstype=auto ro rd.live.image quiet rhgb rd.luks=0 rd.md=0 rd.dm=0 rd.live.dir=/{2}/LiveOS/\n'.format(iso_basename, targetname, iso_basename))
+                    masterueficonf.write('\tinitrdefi /{0}/isolinux/initrd.img\n'.format(iso_basename))
                     masterueficonf.write('}\n')
 
             # Now, we write out the basic video entry
@@ -421,8 +423,8 @@ def makeisolinuximage(isolist, imagedir, mountdir, timeout, bootdefaultiso, targ
             if bootdefaultiso == iso:
                 bvt.write('  menu default\n')
             # Note that we only need the iso_basename for pathing that isolinux will use (kernel and initrd path). All other pathing should use iso_basename.
-            bvt.write('  kernel /{0}/isolinux/vmlinuz0\n'.format(iso_basename))
-            bvt.write('  append initrd=/{0}/isolinux/initrd0.img root=live:CDLABEL={1} live_dir=/{2}/LiveOS/ rootfstype=auto ro rd.live.image quiet rhgb rd.luks=0 rd.md=0 rd.dm=0 xdriver=vesa nomodeset\n'.format(iso_basename, targetname, iso_basename))            
+            bvt.write('  kernel /{0}/isolinux/vmlinuz\n'.format(iso_basename))
+            bvt.write('  append initrd=/{0}/isolinux/initrd.img root=live:CDLABEL={1} rd.live.dir=/{2}/LiveOS/ rootfstype=auto ro rd.live.image quiet rhgb rd.luks=0 rd.md=0 rd.dm=0 xdriver=vesa nomodeset\n'.format(iso_basename, targetname, iso_basename))
             bvt.write('\n')
 
             if pairfound:
@@ -432,8 +434,8 @@ def makeisolinuximage(isolist, imagedir, mountdir, timeout, bootdefaultiso, targ
                 if bootdefaultiso == x86_64_iso:
                     bvt.write('  menu default\n')
                 # Note that we only need the iso_basename for pathing that isolinux will use (kernel and initrd path). All other pathing should use iso_basename.
-                bvt.write('  kernel /{0}/isolinux/vmlinuz0\n'.format(x86_64_iso_basename))
-                bvt.write('  append initrd=/{0}/isolinux/initrd0.img root=live:CDLABEL={1} live_dir=/{2}/LiveOS/ rootfstype=auto ro rd.live.image quiet rhgb rd.luks=0 rd.md=0 rd.dm=0 xdriver=vesa nomodeset\n'.format(x86_64_iso_basename, targetname, x86_64_iso_basename))
+                bvt.write('  kernel /{0}/isolinux/vmlinuz\n'.format(x86_64_iso_basename))
+                bvt.write('  append initrd=/{0}/isolinux/initrd.img root=live:CDLABEL={1} rd.live.dir=/{2}/LiveOS/ rootfstype=auto ro rd.live.image quiet rhgb rd.luks=0 rd.md=0 rd.dm=0 xdriver=vesa nomodeset\n'.format(x86_64_iso_basename, targetname, x86_64_iso_basename))
                 bvt.write('\n')
 
             makehelperdirs(imagedir, iso_basename, "isolinux", verbose)
@@ -457,7 +459,7 @@ def makeisolinuximage(isolist, imagedir, mountdir, timeout, bootdefaultiso, targ
                 mat.write('label {0}\n'.format(pairname))
                 mat.write('  menu label Install {0}\n'.format(pretty_pairname))
                 mat.write('  kernel ifcpu64.c32\n')
-                if bootdefaultiso == iso: 
+                if bootdefaultiso == iso:
                     mat.write('  menu default\n')
                 if bootdefaultiso == x86_64_iso:
                     mat.write('  menu default\n')
@@ -482,7 +484,7 @@ def makeisolinuximage(isolist, imagedir, mountdir, timeout, bootdefaultiso, targ
                         print 'Sleeping for 3 seconds here, otherwise we might try to umount while GNOME is still looking at it.'
                     time.sleep(3)
                     result = os.system(unmount_command)
-                    if result:   
+                    if result:
                         sys.exit('I tried to run {0}, but it failed. Exiting.'.format(unmount_command))
                     mount_command = 'mount -o loop "{0}" "{1}"'.format(x86_64_iso, mountdir)
                     result = os.system(mount_command)
@@ -588,7 +590,7 @@ def makeisolinuximage(isolist, imagedir, mountdir, timeout, bootdefaultiso, targ
         f32.write('menu separator\n')
         f32.write('\n')
         f32.write('label return\n')
-        f32.write('menu label Return to architecture menu...\n') 
+        f32.write('menu label Return to architecture menu...\n')
         f32.write('         menu exit\n')
         f32.write('\n')
         f32.write('menu end\n')
@@ -615,7 +617,7 @@ def makeisolinuximage(isolist, imagedir, mountdir, timeout, bootdefaultiso, targ
 
 
 
-    # Now, write out the Select Architecture menu. 
+    # Now, write out the Select Architecture menu.
     # We use the f32 and f64 entries.
     if multiarch and multiarchentries:
         # Add the separator in the master config
@@ -691,6 +693,30 @@ def makeisolinuximage(isolist, imagedir, mountdir, timeout, bootdefaultiso, targ
     masterconf.close()
     if efi:
         masterueficonf.close()
+        boot_images = [ os.path.join(imagedir, 'images/efiboot.img'),
+                        os.path.join(imagedir, 'images/macboot.img') ]
+        for boot_image in boot_images:
+            if os.path.isfile(boot_image):
+                if verbose:
+                    print 'Preparing to modify bootloader {0}'.format(boot_image)
+                #os.chmod(boot_image, stat.S_IWRITE)
+                if verbose:
+                    print 'Mounting {0} to {1}'.format(boot_image, mountdir)
+                mount_command = 'mount -o loop "{0}" "{1}"'.format(boot_image, mountdir)
+                result = os.system(mount_command)
+                if result:
+                    sys.exit('I tried to run {0}, but it failed. Exiting.'.format(mount_command))
+                if verbose:
+                    print 'Copying {0} to the image {1}'.format(ueficonf, boot_image)
+                shutil.copy2(ueficonf, os.path.join(mountdir, 'EFI/BOOT'))
+                if verbose:
+                    print 'Sleeping for 3 seconds before unmounting {0}'.format(mountdir)
+                time.sleep(3)
+                unmount_command = 'umount "{0}"'.format(mountdir)
+                result = os.system(unmount_command)
+                if result:
+                    sys.exit('I tried to run {0}, but it failed. Exiting.'.format(unmount_command))
+
     if verbose:
         print 'Copying /usr/share/syslinux/isolinux.bin to {0}'.format(isolinuxdir)
     shutil.copy2('/usr/share/syslinux/isolinux.bin', isolinuxdir)
@@ -712,9 +738,11 @@ def makeisolinuximage(isolist, imagedir, mountdir, timeout, bootdefaultiso, targ
             print 'Copying /usr/share/syslinux/ifcpu64.c32 to {0}'.format(isolinuxdir)
         shutil.copy2('/usr/share/syslinux/ifcpu64.c32', isolinuxdir)
     if efi:
-        mkisofs_command = '/usr/bin/mkisofs -allow-leading-dots -allow-multidot -l -relaxed-filenames -no-iso-translate -R -v -V {0} -b isolinux/isolinux.bin -c isolinux/boot.cat -no-emul-boot -boot-load-size 4 -boot-info-table -eltorito-alt-boot -e isolinux/efiboot.img -no-emul-boot -eltorito-alt-boot -e isolinux/macboot.img -no-emul-boot -allow-limited-size -o {1} {2}'.format(targetname, targetiso, imagedir)
+        #mkisofs_command = '/usr/bin/mkisofs -allow-leading-dots -allow-multidot -l -relaxed-filenames -no-iso-translate -J -R -v -V {0} -b isolinux/isolinux.bin -c isolinux/boot.cat -no-emul-boot -boot-load-size 4 -boot-info-table -eltorito-alt-boot -e images/efiboot.img -no-emul-boot -eltorito-alt-boot -e images/macboot.img -no-emul-boot -allow-limited-size -o {1} {2}'.format(targetname, targetiso, imagedir)
+        mkisofs_command = '/usr/bin/mkisofs {0} -U -J -joliet-long -R -v -V {1} -b isolinux/isolinux.bin -c isolinux/boot.cat -no-emul-boot -boot-load-size 4 -boot-info-table -eltorito-alt-boot -e images/efiboot.img -no-emul-boot -eltorito-alt-boot -e images/macboot.img -no-emul-boot -allow-limited-size -o {2} {3}'.format(volumeheaderinfo, targetname, targetiso, imagedir)
     else:
-        mkisofs_command = '/usr/bin/mkisofs -allow-leading-dots -allow-multidot -l -relaxed-filenames -no-iso-translate -R -v -V {0} -b isolinux/isolinux.bin -c isolinux/boot.cat -no-emul-boot -boot-load-size 4 -boot-info-table -allow-limited-size -o {1} {2}'.format(targetname, targetiso, imagedir)
+        #mkisofs_command = '/usr/bin/mkisofs -allow-leading-dots -allow-multidot -l -relaxed-filenames -no-iso-translate -J -R -v -V {0} -b isolinux/isolinux.bin -c isolinux/boot.cat -no-emul-boot -boot-load-size 4 -boot-info-table -allow-limited-size -o {1} {2}'.format(targetname, targetiso, imagedir)
+        mkisofs_command = '/usr/bin/mkisofs {0} -U -J -joliet-long -R -v -V {1} -b isolinux/isolinux.bin -c isolinux/boot.cat -no-emul-boot -boot-load-size 4 -boot-info-table -allow-limited-size -o {2} {3}'.format(volumeheaderinfo, targetname, targetiso, imagedir)
     if verbose:
         print 'Running mkisofs to make {0}:'.format(targetiso)
         print mkisofs_command
@@ -723,7 +751,7 @@ def makeisolinuximage(isolist, imagedir, mountdir, timeout, bootdefaultiso, targ
     if verbose:
         print 'Running isohybrid on the ISO'
     if efi:
-        isohybrid_command = '/usr/bin/isohybrid --uefi --mac {0}'.format(targetiso) 
+        isohybrid_command = '/usr/bin/isohybrid --uefi --mac {0}'.format(targetiso)
     else:
         isohybrid_command = '/usr/bin/isohybrid {0}'.format(targetiso)
     os.system(isohybrid_command)
@@ -776,12 +804,12 @@ def makegrubimage(isolist, imagedir, mountdir, timeout, bootdefaultnum, grubarch
 	    if verbose:
 		print 'Writing ISO specific entry for {0} into grub configs.'.format(iso_basename)
 	    f.write('title {0}\n'.format(iso_basename))
-	    f.write('    kernel /{0}/isolinux/vmlinuz0 root=live:LABEL={1} live_dir=/{0}/LiveOS/ rootfstype=auto ro liveimg quiet  rhgb\n'.format(iso_basename, targetname))
-            f.write('	 initrd /{0}/isolinux/initrd0.img\n'.format(iso_basename))
+	    f.write('    kernel /{0}/isolinux/vmlinuz root=live:LABEL={1} rd.live.dir=/{0}/LiveOS/ rootfstype=auto ro liveimg quiet  rhgb\n'.format(iso_basename, targetname))
+            f.write('	 initrd /{0}/isolinux/initrd.img\n'.format(iso_basename))
             submenu = open(os.path.join(grubdir, 'submenu.lst'), 'w')
 	    submenu.write('title {0}\n'.format(iso_basename))
-	    submenu.write('    kernel /{0}/isolinux/vmlinuz0 root=live:LABEL={1} live_dir=/{0}/LiveOS/ rootfstype=auto ro liveimg quiet  rhgb check\n'.format(iso_basename, targetname))
-	    submenu.write('    initrd /{0}/isolinux/initrd0.img\n'.format(iso_basename))
+	    submenu.write('    kernel /{0}/isolinux/vmlinuz root=live:LABEL={1} rd.live.dir=/{0}/LiveOS/ rootfstype=auto ro liveimg quiet  rhgb check\n'.format(iso_basename, targetname))
+	    submenu.write('    initrd /{0}/isolinux/initrd.img\n'.format(iso_basename))
 	    submenu.close()
 	    makehelperdirs(imagedir, iso_basename, "grub", verbose)
 	else:
@@ -799,7 +827,7 @@ def makegrubimage(isolist, imagedir, mountdir, timeout, bootdefaultnum, grubarch
 	    if verbose:
 		print 'Copying {0} into {1}.'.format(iso, os.path.join(imagedir, iso_basename))
 	    shutil.copy2(iso, os.path.join(imagedir, iso_basename))
-        # Unmount the iso 
+        # Unmount the iso
         unmount_command = 'umount "{0}"'.format(mountdir)
         result = os.system(unmount_command)
         if result:
@@ -810,7 +838,7 @@ def makegrubimage(isolist, imagedir, mountdir, timeout, bootdefaultnum, grubarch
 
     os.symlink('grub.conf', os.path.join(grubdir, 'menu.lst'))
     shutil.copy2('/usr/share/grub/{0}-redhat/stage2_eltorito'.format(grubarch), grubdir)
-    mkisofs_command = '/usr/bin/mkisofs -R -v -V {0} -b boot/grub/stage2_eltorito -no-emul-boot -boot-load-size 4 -boot-info-table -allow-limited-size -o {1} {2}'.format(targetname, targetiso, imagedir)
+    mkisofs_command = '/usr/bin/mkisofs -J -R -v -V {0} -b boot/grub/stage2_eltorito -no-emul-boot -boot-load-size 4 -boot-info-table -allow-limited-size -o {1} {2}'.format(targetname, targetiso, imagedir)
     if verbose:
 	print 'Running mkisofs to make {0}:'.format(targetiso)
         print mkisofs_command
@@ -824,7 +852,7 @@ def parse_isolist(isolist, isodir, parsedisolist, verbose):
 	if '*' in iso:
 	    if verbose:
 		print '{0} is a wildcard, looking for matches ...'.format(iso)
-	    globlist = glob.glob(iso) 
+	    globlist = glob.glob(iso)
 	    # Did we find anything?
 	    if globlist:
                 if verbose:
@@ -911,7 +939,7 @@ if __name__ == '__main__':
                         help = 'Full path to isolinux splash image. Defaults to /usr/share/anaconda/boot/syslinux-splash.png')
 
     parser.add_argument('--mountdir', nargs = '?', default = os.path.join(os.curdir, 'mnt'),
-                        help = 'Working directory for temporarily mounting source ISOs. Defaults to {0}'.format(os.path.join(os.curdir, 'mnt'))) 
+                        help = 'Working directory for temporarily mounting source ISOs. Defaults to {0}'.format(os.path.join(os.curdir, 'mnt')))
 
     parser.add_argument('--nomultiarch', action = 'store_true',
                         help = 'Disable multiarch support in isolinux.cfg (detect whether system is ia32 or x86_64 and choose correct image). \
@@ -928,8 +956,17 @@ if __name__ == '__main__':
     parser.add_argument('--targetname', nargs = '?', metavar = 'NAME', default = 'Multi-Boot',
                         help = 'Name of Multi Boot ISO, not to be confused with filename. Defaults to Multi-Boot.')
 
-    parser.add_argument('--timeout', metavar = 'INT', type = int, nargs = 1, default = 100,
-                        help = 'Timeout for boot selection, default is 100.')
+    parser.add_argument('--timeout', metavar = 'INT', type = int, nargs = 1, default = 10,
+                        help = 'Timeout for boot selection, in seconds, default is 10.')
+
+    parser.add_argument('--preparer', nargs = 1, default=None,
+                        help = 'Text string (128 characters max) that will be written into the volume header that describes the preparer of the ISO.')
+
+    parser.add_argument('--publisher', nargs = 1, default=None,
+                        help = 'Text string (128 characters max) that will be written into the volume header that describes the publisher of the ISO.')
+
+    parser.add_argument('--application', nargs = 1, default=None,
+                        help = 'Text string (128 characters max) that will be written into the volume header that describes the application that will be on the ISO.')
 
     # Verbosity, for debugging
     parser.add_argument('-v', '--verbose', action = 'store_true',
@@ -1030,14 +1067,35 @@ if __name__ == '__main__':
         bootdefaultiso = args.bootdefault
     else:
         bootdefaultiso = isolist[0]
-        
+
 
     if args.verbose:
 	print 'Here are the ISOs that I am going to add:'
 	for item in isolist:
 	    print item
         print 'The default is {0} in position {1}'.format(isolist[bootdefaultnum], bootdefaultnum)
-        
+
+    volumeheaderinfo = ""
+
+    if args.preparer != None:
+        volumeheaderinfo += ' -p "{0}"'.format(args.preparer[0])
+        if args.verbose:
+            print 'PREPARER is set to {0}'.format(args.preparer[0])
+
+    if args.publisher != None:
+        volumeheaderinfo += ' -publisher "{0}"'.format(args.publisher[0])
+        if args.verbose:
+            print 'PUBLISHER is set to {0}'.format(args.publisher[0])
+
+    if args.application != None:
+        volumeheaderinfo += ' -A "{0}"'.format(args.application[0])
+        if args.verbose:
+            print 'APPLICATION is set to {0}'.format(args.application[0])
+
+    volumeheaderinfo = volumeheaderinfo.strip()
+    if args.verbose:
+        print 'volumeheaderinfo = {0}'.format(volumeheaderinfo)
+
     if args.efi:
        # Sanity check for shim
        if os.path.isfile('/boot/efi/EFI/fedora/shim.efi'):
@@ -1075,4 +1133,4 @@ if __name__ == '__main__':
                  print 'Found /usr/share/syslinux/isolinux.bin. Assuming syslinux is installed properly'
         else:
             sys.exit('Could not find /usr/share/syslinux/isolinux.bin ? Perhaps syslinux is not installed?')
-	makeisolinuximage(isolist, args.imagedir, args.mountdir, args.timeout, bootdefaultiso, args.target, args.targetname, args.isolinuxsplash, args.isodir, args.nomultiarch, args.efi, bootdefaultnum, args.verbose)
+	makeisolinuximage(isolist, args.imagedir, args.mountdir, args.timeout, bootdefaultiso, args.target, args.targetname, args.isolinuxsplash, args.isodir, args.nomultiarch, args.efi, bootdefaultnum, args.verbose, volumeheaderinfo)
